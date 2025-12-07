@@ -1,88 +1,671 @@
 <!DOCTYPE html>
-<html>
-<body>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>写真フィルタ（セピア / レトロ / ミニチュア）</title>
 <style>
-  #previewContainer {
-    width: 100%;
-    height: 60vh;
-    overflow: hidden;
-    position: relative;
-    background: black;
+  :root{
+    --bg:#0f1720;
+    --card:#ffffff;
+    --muted:#6b7280;
+    --accent:#1565d8;
+    --safe-pad:16px;
+  }
+  html,body{height:100%;margin:0;}
+  body{
+    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Noto Sans JP", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
+    background: linear-gradient(180deg,#0f1720 0%, #071029 100%);
+    color:#0b1220;
+    display:flex;
+    align-items:flex-start;
+    justify-content:center;
+    padding:calc(var(--safe-pad) + 8px);
+    box-sizing:border-box;
   }
 
-  #preview {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;        /* ← これがとても重要 */
-    transform-origin: center center;  /* 中央からズーム */
+  .app {
+    width:100%;
+    max-width:920px;
+    background: #fff;
+    border-radius:14px;
+    box-shadow: 0 8px 30px rgba(2,6,23,0.45);
+    padding:18px;
+    box-sizing:border-box;
   }
 
-  #captureCanvas {
-    display: none;
+  header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
   }
+  h1{font-size:18px;margin:0;}
+  .controls-top{
+    display:flex;
+    gap:10px;
+    align-items:center;
+  }
+  #fileInput{
+    appearance:none;
+  }
+
+  .main {
+    margin-top:14px;
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+    align-items:center;
+  }
+
+  .canvas-wrap{
+    width:100%;
+    background:#111;
+    border-radius:10px;
+    padding:8px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+
+  canvas{
+    max-width:100%;
+    width:100%;
+    height:auto;
+    border-radius:8px;
+    background:#ddd;
+    touch-action: manipulation;
+  }
+
+  .slider-row{
+    width:100%;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:6px;
+  }
+
+  .slider-row label{
+    font-size:14px;color:var(--muted);
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+
+  .range{
+    width:90%;
+    max-width:540px;
+  }
+
+  .btn-row{
+    width:100%;
+    margin-top:6px;
+    display:flex;
+    gap:10px;
+    justify-content:center;
+  }
+
+  button, .file-btn{
+    background:var(--accent);
+    color:white;
+    border:none;
+    padding:10px 14px;
+    border-radius:10px;
+    font-size:15px;
+    cursor:pointer;
+    box-shadow:0 4px 10px rgba(21,101,216,0.18);
+  }
+  button.secondary{
+    background:#e6e6e6;
+    color:#0b1220;
+    box-shadow:none;
+  }
+
+  /* Bottom filter bar */
+  #filterBar{
+    margin-top:12px;
+    display:flex;
+    gap:10px;
+    overflow-x:auto;
+    padding:10px;
+    background:linear-gradient(180deg, rgba(0,0,0,0.03), rgba(0,0,0,0.01));
+    border-radius:10px;
+  }
+  .filterItem{
+    min-width:82px;
+    flex:0 0 auto;
+    background:#fff;
+    border-radius:10px;
+    border:1px solid #eee;
+    padding:8px;
+    box-sizing:border-box;
+    text-align:center;
+    font-size:13px;
+    color:#222;
+    cursor:pointer;
+    user-select:none;
+  }
+  .filterItem.active{
+    border-color:var(--accent);
+    box-shadow:0 6px 18px rgba(21,101,216,0.12);
+  }
+  .thumb{
+    width:64px;height:48px;border-radius:6px;background:#ddd;margin:0 auto 6px auto; display:block;
+    object-fit:cover;
+  }
+
+  /* small screen tweaks */
+  @media (max-width:520px){
+    .btn-row{flex-direction:column;}
+    .filterItem{min-width:72px;padding:6px;font-size:12px;}
+    .thumb{width:56px;height:40px;}
+  }
+
+  footer{margin-top:12px;font-size:12px;color:var(--muted);text-align:center}
 </style>
+</head>
+<body>
+  <div class="app" role="application" aria-label="写真フィルタアプリ">
+    <header>
+      <h1>写真フィルタ — Sepia / Retro / Miniature</h1>
+      <div class="controls-top">
+        <label class="file-btn" for="fileInput" title="写真を選択">写真を選ぶ</label>
+        <input id="fileInput" type="file" accept="image/*" style="display:none">
+      </div>
+    </header>
 
-<div id="previewContainer">
-  <video id="preview" autoplay playsinline muted></video>
-</div>
+    <div class="main">
+      <div class="canvas-wrap" aria-live="polite">
+        <canvas id="canvas" width="800" height="500"></canvas>
+      </div>
 
-<input id="zoom" type="range" min="1" max="20" value="1" step="0.1">
-<button onclick="takePhoto()">撮影</button>
+      <div class="slider-row" id="sliderRow" style="display:none">
+        <label id="sliderLabel">強度：<strong id="sliderValue">1.00</strong></label>
+        <input id="strengthSlider" class="range" type="range" min="0" max="1" step="0.01" value="1">
+      </div>
 
-<canvas id="captureCanvas"></canvas>
+      <div class="btn-row">
+        <button id="downloadBtn" class="secondary">加工した画像をダウンロード</button>
+        <button id="resetBtn">リセット</button>
+      </div>
+
+      <div id="filterBar" aria-hidden="false">
+        </div>
+
+    </div>
+
+    <footer>※ 画像はローカルで処理され、サーバへアップロードされません。</footer>
+  </div>
 
 <script>
-let stream;
-let video = document.getElementById("preview");
-let zoomBar = document.getElementById("zoom");
+/* --------- Globals & DOM ---------- */
+const fileInput = document.getElementById('fileInput');
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const filterBar = document.getElementById('filterBar');
+const sliderRow = document.getElementById('sliderRow');
+const strengthSlider = document.getElementById('strengthSlider');
+const sliderLabel = document.getElementById('sliderLabel');
+const sliderValue = document.getElementById('sliderValue');
+const downloadBtn = document.getElementById('downloadBtn');
+const resetBtn = document.getElementById('resetBtn');
 
-async function startCamera() {
-    try {
-        stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: "environment" },
-            audio: false
-        });
+let originalImageData = null;
+let originalImg = null;
+let currentFilter = 'original';
+let thumbWidth = 128, thumbHeight = 80;
 
-        video.srcObject = stream;
+/* --------- Filters definition --------- */
+const filters = [
+  { id:'original', name:'Original' },
+  { id:'sepia', name:'セピア' },
+  { id:'retro', name:'レトロ風' },
+  { id:'mini', name:'ミニチュア' }
+];
 
-        video.onloadedmetadata = () => {
-            video.play();
-            applyZoom();
-        };
+/* Populate filter bar with thumbnails and click handlers */
+function createFilterBar(){
+  filterBar.innerHTML = '';
+  filters.forEach(f=>{
+    const item = document.createElement('div');
+    item.className = 'filterItem';
+    item.dataset.filter = f.id;
 
-    } catch(e) {
-        alert("Camera error: " + e.name);
+    const img = document.createElement('canvas');
+    img.className = 'thumb';
+    img.width = thumbWidth;
+    img.height = thumbHeight;
+    img.style.display = 'block';
+
+    const label = document.createElement('div');
+    label.textContent = f.name;
+
+    item.appendChild(img);
+    item.appendChild(label);
+    filterBar.appendChild(item);
+
+    item.addEventListener('click', ()=> {
+      setActiveFilter(f.id);
+      renderCurrent();
+    });
+  });
+}
+
+/* mark active */
+function setActiveFilter(id){
+  currentFilter = id;
+  document.querySelectorAll('.filterItem').forEach(el=>{
+    el.classList.toggle('active', el.dataset.filter === id);
+  });
+
+  // show/hide slider
+  if(id === 'original'){
+    sliderRow.style.display = 'none';
+  } else {
+    sliderRow.style.display = 'flex';
+    sliderLabel.firstChild && (sliderLabel.firstChild.textContent = '');
+    
+    if(id === 'sepia') sliderLabel.innerHTML = 'セピア強度：<strong id="sliderValue">'+Number(strengthSlider.value).toFixed(2)+'</strong>';
+    else if(id === 'retro') sliderLabel.innerHTML = 'レトロ度：<strong id="sliderValue">'+Number(strengthSlider.value).toFixed(2)+'</strong>';
+    else if(id === 'mini') sliderLabel.innerHTML = 'ミニチュア度：<strong id="sliderValue">'+Number(strengthSlider.value).toFixed(2)+'</strong>';
+    
+    // rebind sliderValue ref
+    sliderValueRef = document.getElementById('sliderValue');
+    sliderValueRef.textContent = Number(strengthSlider.value).toFixed(2);
+  }
+}
+
+/* --------- Image load & basic setup ---------- */
+fileInput.addEventListener('change', async (e)=>{
+  const file = e.target.files && e.target.files[0];
+  if(!file) return;
+  const url = URL.createObjectURL(file);
+  await loadImage(url);
+  URL.revokeObjectURL(url);
+});
+
+function loadImage(src){
+  return new Promise((res,rej)=>{
+    const img = new Image();
+    img.onload = ()=>{
+      originalImg = img;
+      // limit size to avoid enormous canvases for mobile but keep aspect ratio
+      const maxW = 1200;
+      let w = img.naturalWidth, h = img.naturalHeight;
+      if(w > maxW){
+        const ratio = maxW / w;
+        w = maxW; h = Math.round(h * ratio);
+      }
+      canvas.width = w;
+      canvas.height = h;
+      ctx.drawImage(img, 0, 0, w, h);
+      originalImageData = ctx.getImageData(0,0,canvas.width, canvas.height);
+      
+      updateAllThumbnails();
+      setActiveFilter('sepia'); // default action
+      renderCurrent();
+      res();
+    };
+    img.onerror = e => rej(e);
+    img.src = src;
+  });
+}
+
+/* --------- Utility functions ---------- */
+function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
+
+function copyImageData(src){
+  return new ImageData(new Uint8ClampedArray(src.data), src.width, src.height);
+}
+
+/* --------- Core filter implementations ---------- */
+
+/* Sepia: strength 0..1 linear interpolation */
+function applySepiaToImageData(srcImageData, strength){
+  const img = copyImageData(srcImageData);
+  const d = img.data;
+  for(let i=0;i<d.length;i+=4){
+    const r = d[i], g = d[i+1], b = d[i+2];
+    const sr = (r * .393) + (g * .769) + (b * .189);
+    const sg = (r * .349) + (g * .686) + (b * .168);
+    const sb = (r * .272) + (g * .534) + (b * .131);
+    d[i]   = r * (1-strength) + sr * strength;
+    d[i+1] = g * (1-strength) + sg * strength;
+    d[i+2] = b * (1-strength) + sb * strength;
+  }
+  return img;
+}
+
+/* Retro: sepia + desaturate + grain + vignette */
+function applyRetroToImageData(srcImageData, strength){
+  const width = srcImageData.width, height = srcImageData.height;
+  const img = copyImageData(srcImageData);
+  const d = img.data;
+  const cx = width/2, cy = height/2;
+  const maxDist = Math.sqrt(cx*cx + cy*cy);
+  const desatAmount = 0.5 * strength;
+  const grainAmount = 20 * strength;
+  const vignettePower = 0.9 * strength;
+  
+  for(let y=0;y<height;y++){
+    for(let x=0;x<width;x++){
+      const i = (y*width + x)*4;
+      let r = d[i], g = d[i+1], b = d[i+2];
+      const lum = 0.299*r + 0.587*g + 0.114*b;
+      r = r*(1-desatAmount) + lum*desatAmount;
+      g = g*(1-desatAmount) + lum*desatAmount;
+      b = b*(1-desatAmount) + lum*desatAmount;
+      
+      const sr = (r * 0.35) + (g * 0.65) + (b * 0.12);
+      const sg = (r * 0.25) + (g * 0.6)  + (b * 0.08);
+      const sb = (r * 0.12) + (g * 0.35) + (b * 0.05);
+      
+      r = r*(0.6) + sr*0.4;
+      g = g*(0.6) + sg*0.4;
+      b = b*(0.6) + sb*0.4;
+      
+      const gRand = (Math.random()-0.5) * grainAmount;
+      r += gRand; g += gRand; b += gRand;
+      
+      const dx = x-cx, dy = y-cy;
+      const dnorm = Math.sqrt(dx*dx + dy*dy) / maxDist;
+      const v = 1 - Math.pow(Math.min(1, dnorm), 2.0 * (1 + vignettePower));
+      r *= v; g *= v; b *= v;
+      
+      d[i] = clamp(Math.round(r), 0, 255);
+      d[i+1] = clamp(Math.round(g), 0, 255);
+      d[i+2] = clamp(Math.round(b), 0, 255);
     }
+  }
+  // blend original
+  const out = copyImageData(srcImageData);
+  const od = out.data;
+  for(let i=0;i<od.length;i+=4){
+    od[i]   = od[i]   * (1 - strength) + d[i]   * strength;
+    od[i+1] = od[i+1] * (1 - strength) + d[i+1] * strength;
+    od[i+2] = od[i+2] * (1 - strength) + d[i+2] * strength;
+    od[i+3] = d[i+3];
+  }
+  return out;
 }
 
-function applyZoom() {
-    const z = zoomBar.value;
-    video.style.transform = `scale(${z})`;  
+/* Miniature (Tilt-Shift) Improved Logic
+  -------------------------------------
+  1. Contrast Enhancement (S-Curve approximation)
+  2. Saturation Boost (Vivid colors)
+  3. Blur with mild radius (Gaussian like)
+  4. Alpha masking (Band)
+*/
+
+// Helper: Apply Contrast and Saturation to create the "Toy" look
+function applyVividness(srcImageData) {
+  const w = srcImageData.width, h = srcImageData.height;
+  const out = copyImageData(srcImageData);
+  const d = out.data;
+  
+  // Python logic uses Spline for S-curve. We approximate an S-curve for contrast.
+  // And HSV scaling for saturation. Here we do it in RGB for performance.
+  
+  // Contrast factor: >1.0 increases contrast.
+  const contrast = 1.2; // Moderately high
+  const intercept = 128 * (1 - contrast);
+  
+  // Saturation factor: >1.0 boosts color
+  const saturation = 1.4; 
+
+  for(let i=0; i<d.length; i+=4) {
+    let r = d[i], g = d[i+1], b = d[i+2];
+
+    // 1. Apply Contrast (Simple Linear w/ midpoint or S-Curve approximation)
+    // Using a simple Sigmoid-like contrast:
+    // val = (val - 128) * contrast + 128
+    r = (r - 128) * contrast + 128;
+    g = (g - 128) * contrast + 128;
+    b = (b - 128) * contrast + 128;
+    
+    // Clamp temp results
+    r = clamp(r, 0, 255);
+    g = clamp(g, 0, 255);
+    b = clamp(b, 0, 255);
+
+    // 2. Apply Saturation
+    // Gray = Luma (Rec 709)
+    const gray = 0.2126*r + 0.7152*g + 0.0722*b;
+    
+    r = gray + (r - gray) * saturation;
+    g = gray + (g - gray) * saturation;
+    b = gray + (b - gray) * saturation;
+
+    d[i]   = clamp(r, 0, 255);
+    d[i+1] = clamp(g, 0, 255);
+    d[i+2] = clamp(b, 0, 255);
+  }
+  return out;
 }
 
-zoomBar.oninput = applyZoom;
+/* Main Miniature Function */
+async function applyMiniature(srcImageData, strength) {
+  // strength 0..1 controls the transition width and blur intensity (but capped lower than before)
+  
+  // Step 1: Create Vivid Image (Sharp)
+  // This mimics the Python: Contrast Spline + HSV Saturation
+  const vividData = applyVividness(srcImageData);
+  
+  const w = vividData.width, h = vividData.height;
 
-function takePhoto() {
-    const canvas = document.getElementById("captureCanvas");
-    const ctx = canvas.getContext("2d");
-
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-
-    const zoom = zoomBar.value;
-
-    const w = canvas.width / zoom;
-    const h = canvas.height / zoom;
-    const x = (canvas.width - w) / 2;
-    const y = (canvas.height - h) / 2;
-
-    ctx.drawImage(video, x, y, w, h, 0, 0, canvas.width, canvas.height);
-
-    const url = canvas.toDataURL("image/jpeg");
-    window.open(url);
+  // Step 2: Create Blurred version of the Vivid Image
+  // Using Canvas filter is faster than JS loop.
+  // Python used GaussianBlur((5,5), 4). 
+  // We will scale blur radius by strength, max ~6px (mild blur is key for visibility)
+  const maxBlur = 6.0; 
+  const blurRadius = Math.max(1, maxBlur * strength); 
+  
+  const tempCanvas = document.createElement('canvas');
+  tempCanvas.width = w; tempCanvas.height = h;
+  const tctx = tempCanvas.getContext('2d');
+  
+  // Put vivid data
+  tctx.putImageData(vividData, 0, 0);
+  
+  // Create another canvas to render the blur
+  const blurCanvas = document.createElement('canvas');
+  blurCanvas.width = w; blurCanvas.height = h;
+  const bctx = blurCanvas.getContext('2d');
+  
+  bctx.filter = `blur(${blurRadius}px)`;
+  bctx.drawImage(tempCanvas, 0, 0);
+  
+  // Get blurred pixels
+  const blurredData = bctx.getImageData(0,0,w,h);
+  
+  // Step 3: Alpha Blend (Band Mask)
+  // Mimic get_alpha_band: center sharp, outer blurred.
+  const out = copyImageData(vividData);
+  const od = out.data;
+  const sd = vividData.data; // sharp
+  const bd = blurredData.data; // blurred
+  
+  // Band parameters
+  // Center is fixed around middle (or slightly lower/higher). Python used 200/256 (bottom). 
+  // Let's keep it vertically centered for general use, or adjustable.
+  const centerY = h / 2;
+  
+  // "width" in Python was the area that is sharp.
+  // As strength increases, the "sharp area" gets narrower (more toy-like).
+  const sharpBandWidth = h * (0.35 - 0.15 * strength); // 20% to 35% of height is sharp
+  const transitionWidth = h * 0.15; // smoothness of fade
+  
+  for(let y=0; y<h; y++){
+    // Calculate alpha (0 = blur, 1 = sharp)
+    const dist = Math.abs(y - centerY);
+    let alpha = 0;
+    
+    // Inside sharp band
+    if(dist < sharpBandWidth / 2) {
+      alpha = 1;
+    } else {
+      // Linear falloff (or smoothstep)
+      const distBeyond = dist - (sharpBandWidth / 2);
+      const t = 1 - (distBeyond / transitionWidth);
+      alpha = clamp(t, 0, 1);
+      // Smoothstep for nicer transition: t*t*(3-2t)
+      alpha = alpha * alpha * (3 - 2 * alpha);
+    }
+    
+    // Blend row
+    // optimization: if alpha is 1, copy sharp. if 0, copy blur.
+    for(let x=0; x<w; x++){
+      const i = (y*w + x)*4;
+      if(alpha >= 0.99) {
+        od[i] = sd[i]; od[i+1] = sd[i+1]; od[i+2] = sd[i+2];
+      } else if(alpha <= 0.01) {
+        od[i] = bd[i]; od[i+1] = bd[i+1]; od[i+2] = bd[i+2];
+      } else {
+        od[i]   = sd[i]*alpha + bd[i]*(1-alpha);
+        od[i+1] = sd[i+1]*alpha + bd[i+1]*(1-alpha);
+        od[i+2] = sd[i+2]*alpha + bd[i+2]*(1-alpha);
+      }
+      od[i+3] = 255;
+    }
+  }
+  
+  return out;
 }
 
-startCamera();
+
+/* --------- Render logic ---------- */
+let sliderValueRef = sliderValue;
+
+async function renderCurrent(){
+  if(!originalImageData) return;
+  const strength = parseFloat(strengthSlider.value);
+  andShowSliderVal(strength);
+  
+  if(currentFilter === 'original'){
+    ctx.putImageData(originalImageData, 0, 0);
+    return;
+  }
+  if(currentFilter === 'sepia'){
+    const out = applySepiaToImageData(originalImageData, strength);
+    ctx.putImageData(out, 0, 0);
+    return;
+  }
+  if(currentFilter === 'retro'){
+    const out = applyRetroToImageData(originalImageData, strength);
+    ctx.putImageData(out, 0, 0);
+    return;
+  }
+  if(currentFilter === 'mini'){
+    const out = await applyMiniature(originalImageData, strength);
+    ctx.putImageData(out, 0, 0);
+    return;
+  }
+}
+
+function andShowSliderVal(v){
+  if(!sliderValueRef){
+    sliderValueRef = document.getElementById('sliderValue');
+  }
+  sliderValueRef.textContent = Number(v).toFixed(2);
+}
+
+strengthSlider.addEventListener('input', ()=>{
+  andShowSliderVal(strengthSlider.value);
+  renderCurrent();
+});
+
+downloadBtn.addEventListener('click', ()=>{
+  if(!originalImageData) return alert('まずは画像を選択してください');
+  const url = canvas.toDataURL('image/jpeg', 0.85);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${currentFilter || 'image'}_edited.jpg`;
+  a.click();
+});
+
+resetBtn.addEventListener('click', ()=>{
+  if(!originalImageData) return;
+  strengthSlider.value = 1;
+  setActiveFilter('original');
+  renderCurrent();
+});
+
+/* Update thumbnails for filter bar */
+function updateAllThumbnails(){
+  const items = document.querySelectorAll('.filterItem');
+  items.forEach(async (el, idx)=>{
+    const canvasThumb = el.querySelector('canvas');
+    const ctxT = canvasThumb.getContext('2d');
+    const iw = originalImageData.width, ih = originalImageData.height;
+    const tw = canvasThumb.width, th = canvasThumb.height;
+    
+    // Create scaled down temp image
+    const tmp = document.createElement('canvas');
+    tmp.width = iw; tmp.height = ih;
+    tmp.getContext('2d').putImageData(originalImageData,0,0);
+    
+    // Draw scaled to thumb
+    ctxT.clearRect(0,0,tw,th);
+    ctxT.drawImage(tmp, 0,0, iw, ih, 0,0, tw, th);
+    
+    const filterId = el.dataset.filter;
+    const idata = ctxT.getImageData(0,0,tw,th);
+    
+    if(filterId === 'sepia'){
+      const out = applySepiaToImageData(idata, 1.0);
+      ctxT.putImageData(out,0,0);
+    } else if(filterId === 'retro'){
+      const out = applyRetroToImageData(idata, 1.0);
+      ctxT.putImageData(out,0,0);
+    } else if(filterId === 'mini'){
+      // For thumbnail, just apply vividness and slight blur to edges manually or via full function
+      // To be accurate, let's run the actual function on the small data
+      const out = await applyMiniature(idata, 1.0);
+      ctxT.putImageData(out,0,0);
+    }
+  });
+}
+
+/* initialize UI */
+createFilterBar();
+setActiveFilter('original');
+
+/* D&D support */
+canvas.addEventListener('dragover', (e)=>{ e.preventDefault(); });
+canvas.addEventListener('drop', (e)=>{
+  e.preventDefault();
+  const f = e.dataTransfer.files && e.dataTransfer.files[0];
+  if(f){
+    const url = URL.createObjectURL(f);
+    loadImage(url).then(()=> URL.revokeObjectURL(url));
+  }
+});
+
+/* placeholder */
+function drawPlaceholder(){
+  ctx.clearRect(0,0,canvas.width, canvas.height);
+  const w = canvas.width = Math.min(900, Math.max(600, window.innerWidth - 120));
+  const h = canvas.height = Math.round(w * 0.62);
+  ctx.fillStyle = '#111';
+  ctx.fillRect(0,0,w,h);
+  ctx.fillStyle = '#ddd';
+  ctx.font = '16px system-ui, -apple-system';
+  ctx.textAlign = 'center';
+  ctx.fillText('「写真を選ぶ」か ↓ に画像をドラッグ＆ドロップ', w/2, h/2 - 10);
+}
+drawPlaceholder();
+
+/* Keyboard nav */
+filterBar.addEventListener('keydown', (e)=>{
+  if(e.key === 'ArrowRight') {
+    const next = document.activeElement.nextElementSibling;
+    next && next.focus();
+  }
+  if(e.key === 'ArrowLeft') {
+    const prev = document.activeElement.previousElementSibling;
+    prev && prev.focus();
+  }
+});
 </script>
 </body>
 </html>
