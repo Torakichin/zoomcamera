@@ -2,19 +2,32 @@
 <html>
 <body>
 <style>
+  #previewContainer {
+    width: 100%;
+    height: 60vh;
+    overflow: hidden;
+    position: relative;
+    background: black;
+  }
+
   #preview {
     width: 100%;
-    transform: scale(1); 
-    transform-origin: center center;
+    height: 100%;
+    object-fit: cover;        /* ← これがとても重要 */
+    transform-origin: center center;  /* 中央からズーム */
   }
+
   #captureCanvas {
-    display: none; /* ← 通常は非表示 */
+    display: none;
   }
 </style>
 
-<video id="preview" autoplay playsinline muted></video>
-<button onclick="takePhoto()">撮影</button>
+<div id="previewContainer">
+  <video id="preview" autoplay playsinline muted></video>
+</div>
+
 <input id="zoom" type="range" min="1" max="20" value="1" step="0.1">
+<button onclick="takePhoto()">撮影</button>
 
 <canvas id="captureCanvas"></canvas>
 
@@ -32,20 +45,19 @@ async function startCamera() {
 
         video.srcObject = stream;
 
-        // Safari対策：video が再生開始された後にズームを適用
         video.onloadedmetadata = () => {
             video.play();
             applyZoom();
         };
 
-    } catch (e) {
-        alert("カメラエラー: " + e.name);
+    } catch(e) {
+        alert("Camera error: " + e.name);
     }
 }
 
 function applyZoom() {
     const z = zoomBar.value;
-    video.style.transform = `scale(${z})`;
+    video.style.transform = `scale(${z})`;  
 }
 
 zoomBar.oninput = applyZoom;
@@ -54,12 +66,11 @@ function takePhoto() {
     const canvas = document.getElementById("captureCanvas");
     const ctx = canvas.getContext("2d");
 
-    // canvasサイズを video に合わせる
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
 
-    // 現在のズームを反映して切り取る
     const zoom = zoomBar.value;
+
     const w = canvas.width / zoom;
     const h = canvas.height / zoom;
     const x = (canvas.width - w) / 2;
@@ -67,9 +78,8 @@ function takePhoto() {
 
     ctx.drawImage(video, x, y, w, h, 0, 0, canvas.width, canvas.height);
 
-    // 撮影結果を別ウィンドウに表示
-    const imgUrl = canvas.toDataURL("image/jpeg");
-    window.open(imgUrl);
+    const url = canvas.toDataURL("image/jpeg");
+    window.open(url);
 }
 
 startCamera();
