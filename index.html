@@ -32,7 +32,33 @@
     box-shadow: 0 8px 30px rgba(2,6,23,0.45);
     padding:18px;
     box-sizing:border-box;
+    position: relative;
   }
+
+  /* Loading Overlay */
+  #loadingOverlay {
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(255,255,255,0.85);
+    z-index: 100;
+    border-radius: 14px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    color: var(--accent);
+    display: none; /* hidden by default */
+  }
+  .spinner {
+    width: 40px; height: 40px;
+    border: 4px solid #ddd;
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-bottom: 10px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
 
   header{
     display:flex;
@@ -46,6 +72,7 @@
     gap:10px;
     align-items:center;
   }
+  /* 重要: acceptを具体的に指定することでiOSに変換を強制させる */
   #fileInput{
     appearance:none;
   }
@@ -66,6 +93,7 @@
     display:flex;
     align-items:center;
     justify-content:center;
+    min-height: 200px;
   }
 
   canvas{
@@ -114,6 +142,7 @@
     font-size:15px;
     cursor:pointer;
     box-shadow:0 4px 10px rgba(21,101,216,0.18);
+    text-align: center;
   }
   button.secondary{
     background:#e6e6e6;
@@ -121,7 +150,6 @@
     box-shadow:none;
   }
 
-  /* Bottom filter bar */
   #filterBar{
     margin-top:12px;
     display:flex;
@@ -130,6 +158,8 @@
     padding:10px;
     background:linear-gradient(180deg, rgba(0,0,0,0.03), rgba(0,0,0,0.01));
     border-radius:10px;
+    width: 100%;
+    box-sizing: border-box;
   }
   .filterItem{
     min-width:82px;
@@ -154,7 +184,6 @@
     object-fit:cover;
   }
 
-  /* small screen tweaks */
   @media (max-width:520px){
     .btn-row{flex-direction:column;}
     .filterItem{min-width:72px;padding:6px;font-size:12px;}
@@ -166,11 +195,16 @@
 </head>
 <body>
   <div class="app" role="application" aria-label="写真フィルタアプリ">
+    <div id="loadingOverlay">
+      <div class="spinner"></div>
+      <div id="loadingText">画像を処理中...</div>
+    </div>
+
     <header>
-      <h1>写真フィルタ — Sepia / Retro / Miniature</h1>
+      <h1>写真フィルタ</h1>
       <div class="controls-top">
         <label class="file-btn" for="fileInput" title="写真を選択">写真を選ぶ</label>
-        <input id="fileInput" type="file" accept="image/*" style="display:none">
+        <input id="fileInput" type="file" accept="image/jpeg, image/png" style="display:none">
       </div>
     </header>
 
@@ -185,16 +219,14 @@
       </div>
 
       <div class="btn-row">
-        <button id="downloadBtn" class="secondary">加工した画像をダウンロード</button>
+        <button id="downloadBtn" class="secondary">画像を保存</button>
         <button id="resetBtn">リセット</button>
       </div>
 
-      <div id="filterBar" aria-hidden="false">
-        </div>
-
+      <div id="filterBar" aria-hidden="false"></div>
     </div>
 
-    <footer>※ 画像はローカルで処理され、サーバへアップロードされません。</footer>
+    <footer>※ 画像は端末内で処理され、外部へ送信されません。</footer>
   </div>
 
 <script>
@@ -209,11 +241,17 @@ const sliderLabel = document.getElementById('sliderLabel');
 const sliderValue = document.getElementById('sliderValue');
 const downloadBtn = document.getElementById('downloadBtn');
 const resetBtn = document.getElementById('resetBtn');
+const loadingOverlay = document.getElementById('loadingOverlay');
 
 let originalImageData = null;
 let originalImg = null;
 let currentFilter = 'original';
 let thumbWidth = 128, thumbHeight = 80;
+
+/* --------- UI Helpers ---------- */
+function showLoading(show){
+  loadingOverlay.style.display = show ? 'flex' : 'none';
+}
 
 /* --------- Filters definition --------- */
 const filters = [
@@ -223,7 +261,6 @@ const filters = [
   { id:'mini', name:'ミニチュア' }
 ];
 
-/* Populate filter bar with thumbnails and click handlers */
 function createFilterBar(){
   filterBar.innerHTML = '';
   filters.forEach(f=>{
@@ -245,43 +282,62 @@ function createFilterBar(){
     filterBar.appendChild(item);
 
     item.addEventListener('click', ()=> {
+      if(!originalImageData) return;
       setActiveFilter(f.id);
-      renderCurrent();
+      // use setTimeout to allow UI to update active class before heavy render
+      setTimeout(()=>{
+        showLoading(true);
+        // tiny delay to render loader
+        requestAnimationFrame(async ()=>{
+            await renderCurrent();
+            showLoading(false);
+        });
+      }, 10);
     });
   });
 }
 
-/* mark active */
 function setActiveFilter(id){
   currentFilter = id;
   document.querySelectorAll('.filterItem').forEach(el=>{
     el.classList.toggle('active', el.dataset.filter === id);
   });
 
-  // show/hide slider
   if(id === 'original'){
     sliderRow.style.display = 'none';
   } else {
     sliderRow.style.display = 'flex';
-    sliderLabel.firstChild && (sliderLabel.firstChild.textContent = '');
-    
     if(id === 'sepia') sliderLabel.innerHTML = 'セピア強度：<strong id="sliderValue">'+Number(strengthSlider.value).toFixed(2)+'</strong>';
     else if(id === 'retro') sliderLabel.innerHTML = 'レトロ度：<strong id="sliderValue">'+Number(strengthSlider.value).toFixed(2)+'</strong>';
     else if(id === 'mini') sliderLabel.innerHTML = 'ミニチュア度：<strong id="sliderValue">'+Number(strengthSlider.value).toFixed(2)+'</strong>';
     
-    // rebind sliderValue ref
+    // rebind ref
     sliderValueRef = document.getElementById('sliderValue');
     sliderValueRef.textContent = Number(strengthSlider.value).toFixed(2);
   }
 }
 
-/* --------- Image load & basic setup ---------- */
+/* --------- Image Load Logic ---------- */
 fileInput.addEventListener('change', async (e)=>{
   const file = e.target.files && e.target.files[0];
   if(!file) return;
+
+  showLoading(true);
+  
+  // Create object URL
   const url = URL.createObjectURL(file);
-  await loadImage(url);
-  URL.revokeObjectURL(url);
+  
+  try {
+    await loadImage(url);
+    // iOS sometimes retains file input value, clear it to allow re-selection of same file
+    fileInput.value = ''; 
+  } catch(err) {
+    alert('画像の読み込みに失敗しました。別の画像をお試しください。');
+    console.error(err);
+  } finally {
+    URL.revokeObjectURL(url);
+    showLoading(false);
+  }
 });
 
 function loadImage(src){
@@ -289,7 +345,7 @@ function loadImage(src){
     const img = new Image();
     img.onload = ()=>{
       originalImg = img;
-      // limit size to avoid enormous canvases for mobile but keep aspect ratio
+      // limit size to 1200px (Performance on iOS)
       const maxW = 1200;
       let w = img.naturalWidth, h = img.naturalHeight;
       if(w > maxW){
@@ -302,11 +358,11 @@ function loadImage(src){
       originalImageData = ctx.getImageData(0,0,canvas.width, canvas.height);
       
       updateAllThumbnails();
-      setActiveFilter('sepia'); // default action
+      setActiveFilter('sepia'); 
       renderCurrent();
       res();
     };
-    img.onerror = e => rej(e);
+    img.onerror = (e) => rej(e);
     img.src = src;
   });
 }
@@ -318,9 +374,89 @@ function copyImageData(src){
   return new ImageData(new Uint8ClampedArray(src.data), src.width, src.height);
 }
 
-/* --------- Core filter implementations ---------- */
+/* --------- Manual Blur Implementation for iOS Support ---------- */
+/* ブラウザの filter = 'blur()' はiOS Safariでバグが多いため、
+   JavaScriptによる手動Box Blur(近似ガウス)を実装します。
+   3回通すことでガウスぼかしに近づけます。
+*/
+function boxBlurH(scl, tcl, w, h, r) {
+    var iarr = 1 / (r+r+1);
+    for(var i=0; i<h; i++) {
+        var ti = i*w, li = ti, ri = ti+r;
+        var fv = scl[ti], lv = scl[ti+w-1], val = (r+1)*fv;
+        for(var j=0; j<r; j++) val += scl[ti+j];
+        for(var j=0  ; j<=r ; j++) { val += scl[ri++] - fv       ; tcl[ti++] = Math.round(val*iarr); }
+        for(var j=r+1; j<w-r; j++) { val += scl[ri++] - scl[li++]; tcl[ti++] = Math.round(val*iarr); }
+        for(var j=w-r; j<w  ; j++) { val += lv        - scl[li++]; tcl[ti++] = Math.round(val*iarr); }
+    }
+}
+function boxBlurT(scl, tcl, w, h, r) {
+    var iarr = 1 / (r+r+1);
+    for(var i=0; i<w; i++) {
+        var ti = i, li = ti, ri = ti+r*w;
+        var fv = scl[ti], lv = scl[ti+w*(h-1)], val = (r+1)*fv;
+        for(var j=0; j<r; j++) val += scl[ti+j*w];
+        for(var j=0  ; j<=r ; j++) { val += scl[ri] - fv     ; tcl[ti] = Math.round(val*iarr); ri+=w; ti+=w; }
+        for(var j=r+1; j<h-r; j++) { val += scl[ri] - scl[li]; tcl[ti] = Math.round(val*iarr); li+=w; ri+=w; ti+=w; }
+        for(var j=h-r; j<h  ; j++) { val += lv      - scl[li]; tcl[ti] = Math.round(val*iarr); li+=w; ti+=w; }
+    }
+}
+function boxBlur(scl, tcl, w, h, r) {
+    for(var i=0; i<scl.length; i++) tcl[i] = scl[i];
+    boxBlurH(tcl, scl, w, h, r);
+    boxBlurT(scl, tcl, w, h, r);
+}
+// Apply Box Blur to ImageData (only RGB, ignores Alpha for simplicity or copies it)
+function applyManualBlur(imageData, radius) {
+    // 整数半径
+    var r = Math.round(radius);
+    if(r < 1) return copyImageData(imageData);
 
-/* Sepia: strength 0..1 linear interpolation */
+    var w = imageData.width;
+    var h = imageData.height;
+    var data = new Uint8ClampedArray(imageData.data); // Copy
+    
+    // Separate channels for processing
+    var rCh = new Uint8Array(w*h);
+    var gCh = new Uint8Array(w*h);
+    var bCh = new Uint8Array(w*h);
+    
+    for(var i=0; i<w*h; i++) {
+        rCh[i] = data[i*4];
+        gCh[i] = data[i*4+1];
+        bCh[i] = data[i*4+2];
+    }
+    
+    // Temp buffers
+    var rT = new Uint8Array(w*h);
+    var gT = new Uint8Array(w*h);
+    var bT = new Uint8Array(w*h);
+
+    // 2 passes for smoother look
+    boxBlur(rCh, rT, w, h, r);
+    boxBlur(gCh, gT, w, h, r);
+    boxBlur(bCh, bT, w, h, r);
+    
+    boxBlur(rCh, rT, w, h, r);
+    boxBlur(gCh, gT, w, h, r);
+    boxBlur(bCh, bT, w, h, r);
+
+    // Write back
+    var out = new ImageData(w, h);
+    var od = out.data;
+    for(var i=0; i<w*h; i++) {
+        od[i*4]   = rCh[i];
+        od[i*4+1] = gCh[i];
+        od[i*4+2] = bCh[i];
+        od[i*4+3] = data[i*4+3]; // preserve alpha
+    }
+    return out;
+}
+
+
+/* --------- Core Filter Logic ---------- */
+
+/* Sepia */
 function applySepiaToImageData(srcImageData, strength){
   const img = copyImageData(srcImageData);
   const d = img.data;
@@ -336,7 +472,7 @@ function applySepiaToImageData(srcImageData, strength){
   return img;
 }
 
-/* Retro: sepia + desaturate + grain + vignette */
+/* Retro */
 function applyRetroToImageData(srcImageData, strength){
   const width = srcImageData.width, height = srcImageData.height;
   const img = copyImageData(srcImageData);
@@ -389,131 +525,73 @@ function applyRetroToImageData(srcImageData, strength){
   return out;
 }
 
-/* Miniature (Tilt-Shift) Improved Logic
-  -------------------------------------
-  1. Contrast Enhancement (S-Curve approximation)
-  2. Saturation Boost (Vivid colors)
-  3. Blur with mild radius (Gaussian like)
-  4. Alpha masking (Band)
-*/
-
-// Helper: Apply Contrast and Saturation to create the "Toy" look
+/* Miniature - Vividness + Manual Blur */
 function applyVividness(srcImageData) {
   const w = srcImageData.width, h = srcImageData.height;
   const out = copyImageData(srcImageData);
   const d = out.data;
   
-  // Python logic uses Spline for S-curve. We approximate an S-curve for contrast.
-  // And HSV scaling for saturation. Here we do it in RGB for performance.
-  
-  // Contrast factor: >1.0 increases contrast.
-  const contrast = 1.2; // Moderately high
-  const intercept = 128 * (1 - contrast);
-  
-  // Saturation factor: >1.0 boosts color
+  // Contrast & Saturation constants
+  const contrast = 1.2; 
   const saturation = 1.4; 
 
   for(let i=0; i<d.length; i+=4) {
     let r = d[i], g = d[i+1], b = d[i+2];
 
-    // 1. Apply Contrast (Simple Linear w/ midpoint or S-Curve approximation)
-    // Using a simple Sigmoid-like contrast:
-    // val = (val - 128) * contrast + 128
+    // 1. Contrast
     r = (r - 128) * contrast + 128;
     g = (g - 128) * contrast + 128;
     b = (b - 128) * contrast + 128;
     
-    // Clamp temp results
-    r = clamp(r, 0, 255);
-    g = clamp(g, 0, 255);
-    b = clamp(b, 0, 255);
+    r = clamp(r, 0, 255); g = clamp(g, 0, 255); b = clamp(b, 0, 255);
 
-    // 2. Apply Saturation
-    // Gray = Luma (Rec 709)
+    // 2. Saturation
     const gray = 0.2126*r + 0.7152*g + 0.0722*b;
-    
     r = gray + (r - gray) * saturation;
     g = gray + (g - gray) * saturation;
     b = gray + (b - gray) * saturation;
 
-    d[i]   = clamp(r, 0, 255);
-    d[i+1] = clamp(g, 0, 255);
-    d[i+2] = clamp(b, 0, 255);
+    d[i] = clamp(r, 0, 255); d[i+1] = clamp(g, 0, 255); d[i+2] = clamp(b, 0, 255);
   }
   return out;
 }
 
 /* Main Miniature Function */
 async function applyMiniature(srcImageData, strength) {
-  // strength 0..1 controls the transition width and blur intensity (but capped lower than before)
-  
-  // Step 1: Create Vivid Image (Sharp)
-  // This mimics the Python: Contrast Spline + HSV Saturation
+  // 1. Vivid
   const vividData = applyVividness(srcImageData);
-  
   const w = vividData.width, h = vividData.height;
 
-  // Step 2: Create Blurred version of the Vivid Image
-  // Using Canvas filter is faster than JS loop.
-  // Python used GaussianBlur((5,5), 4). 
-  // We will scale blur radius by strength, max ~6px (mild blur is key for visibility)
+  // 2. Manual Blur (Replacing ctx.filter)
   const maxBlur = 6.0; 
   const blurRadius = Math.max(1, maxBlur * strength); 
   
-  const tempCanvas = document.createElement('canvas');
-  tempCanvas.width = w; tempCanvas.height = h;
-  const tctx = tempCanvas.getContext('2d');
+  // ブラウザAPIを使わずJSで計算（iOS対応）
+  const blurredData = applyManualBlur(vividData, blurRadius);
   
-  // Put vivid data
-  tctx.putImageData(vividData, 0, 0);
-  
-  // Create another canvas to render the blur
-  const blurCanvas = document.createElement('canvas');
-  blurCanvas.width = w; blurCanvas.height = h;
-  const bctx = blurCanvas.getContext('2d');
-  
-  bctx.filter = `blur(${blurRadius}px)`;
-  bctx.drawImage(tempCanvas, 0, 0);
-  
-  // Get blurred pixels
-  const blurredData = bctx.getImageData(0,0,w,h);
-  
-  // Step 3: Alpha Blend (Band Mask)
-  // Mimic get_alpha_band: center sharp, outer blurred.
+  // 3. Alpha Blend
   const out = copyImageData(vividData);
   const od = out.data;
-  const sd = vividData.data; // sharp
-  const bd = blurredData.data; // blurred
+  const sd = vividData.data; 
+  const bd = blurredData.data; 
   
-  // Band parameters
-  // Center is fixed around middle (or slightly lower/higher). Python used 200/256 (bottom). 
-  // Let's keep it vertically centered for general use, or adjustable.
   const centerY = h / 2;
-  
-  // "width" in Python was the area that is sharp.
-  // As strength increases, the "sharp area" gets narrower (more toy-like).
-  const sharpBandWidth = h * (0.35 - 0.15 * strength); // 20% to 35% of height is sharp
-  const transitionWidth = h * 0.15; // smoothness of fade
+  const sharpBandWidth = h * (0.35 - 0.15 * strength); 
+  const transitionWidth = h * 0.15; 
   
   for(let y=0; y<h; y++){
-    // Calculate alpha (0 = blur, 1 = sharp)
     const dist = Math.abs(y - centerY);
     let alpha = 0;
     
-    // Inside sharp band
     if(dist < sharpBandWidth / 2) {
       alpha = 1;
     } else {
-      // Linear falloff (or smoothstep)
       const distBeyond = dist - (sharpBandWidth / 2);
       const t = 1 - (distBeyond / transitionWidth);
       alpha = clamp(t, 0, 1);
-      // Smoothstep for nicer transition: t*t*(3-2t)
       alpha = alpha * alpha * (3 - 2 * alpha);
     }
     
-    // Blend row
-    // optimization: if alpha is 1, copy sharp. if 0, copy blur.
     for(let x=0; x<w; x++){
       const i = (y*w + x)*4;
       if(alpha >= 0.99) {
@@ -528,10 +606,8 @@ async function applyMiniature(srcImageData, strength) {
       od[i+3] = 255;
     }
   }
-  
   return out;
 }
-
 
 /* --------- Render logic ---------- */
 let sliderValueRef = sliderValue;
@@ -541,25 +617,24 @@ async function renderCurrent(){
   const strength = parseFloat(strengthSlider.value);
   andShowSliderVal(strength);
   
-  if(currentFilter === 'original'){
-    ctx.putImageData(originalImageData, 0, 0);
-    return;
-  }
-  if(currentFilter === 'sepia'){
-    const out = applySepiaToImageData(originalImageData, strength);
-    ctx.putImageData(out, 0, 0);
-    return;
-  }
-  if(currentFilter === 'retro'){
-    const out = applyRetroToImageData(originalImageData, strength);
-    ctx.putImageData(out, 0, 0);
-    return;
-  }
-  if(currentFilter === 'mini'){
-    const out = await applyMiniature(originalImageData, strength);
-    ctx.putImageData(out, 0, 0);
-    return;
-  }
+  // Use setTimeout to ensure UI remains responsive during heavy calc
+  return new Promise(resolve => {
+    setTimeout(async () => {
+        if(currentFilter === 'original'){
+            ctx.putImageData(originalImageData, 0, 0);
+        } else if(currentFilter === 'sepia'){
+            const out = applySepiaToImageData(originalImageData, strength);
+            ctx.putImageData(out, 0, 0);
+        } else if(currentFilter === 'retro'){
+            const out = applyRetroToImageData(originalImageData, strength);
+            ctx.putImageData(out, 0, 0);
+        } else if(currentFilter === 'mini'){
+            const out = await applyMiniature(originalImageData, strength);
+            ctx.putImageData(out, 0, 0);
+        }
+        resolve();
+    }, 0);
+  });
 }
 
 function andShowSliderVal(v){
@@ -569,9 +644,18 @@ function andShowSliderVal(v){
   sliderValueRef.textContent = Number(v).toFixed(2);
 }
 
+/* Debounce for slider to prevent freezing while dragging */
+let renderTimeout;
 strengthSlider.addEventListener('input', ()=>{
   andShowSliderVal(strengthSlider.value);
-  renderCurrent();
+  clearTimeout(renderTimeout);
+  renderTimeout = setTimeout(()=>{
+      showLoading(true);
+      requestAnimationFrame(async ()=>{
+          await renderCurrent();
+          showLoading(false);
+      });
+  }, 100);
 });
 
 downloadBtn.addEventListener('click', ()=>{
@@ -590,21 +674,19 @@ resetBtn.addEventListener('click', ()=>{
   renderCurrent();
 });
 
-/* Update thumbnails for filter bar */
 function updateAllThumbnails(){
+  // Create scaled down temp image
+  const iw = originalImageData.width, ih = originalImageData.height;
+  const tmp = document.createElement('canvas');
+  tmp.width = iw; tmp.height = ih;
+  tmp.getContext('2d').putImageData(originalImageData,0,0);
+  
   const items = document.querySelectorAll('.filterItem');
   items.forEach(async (el, idx)=>{
     const canvasThumb = el.querySelector('canvas');
     const ctxT = canvasThumb.getContext('2d');
-    const iw = originalImageData.width, ih = originalImageData.height;
     const tw = canvasThumb.width, th = canvasThumb.height;
     
-    // Create scaled down temp image
-    const tmp = document.createElement('canvas');
-    tmp.width = iw; tmp.height = ih;
-    tmp.getContext('2d').putImageData(originalImageData,0,0);
-    
-    // Draw scaled to thumb
     ctxT.clearRect(0,0,tw,th);
     ctxT.drawImage(tmp, 0,0, iw, ih, 0,0, tw, th);
     
@@ -618,8 +700,6 @@ function updateAllThumbnails(){
       const out = applyRetroToImageData(idata, 1.0);
       ctxT.putImageData(out,0,0);
     } else if(filterId === 'mini'){
-      // For thumbnail, just apply vividness and slight blur to edges manually or via full function
-      // To be accurate, let's run the actual function on the small data
       const out = await applyMiniature(idata, 1.0);
       ctxT.putImageData(out,0,0);
     }
@@ -636,8 +716,12 @@ canvas.addEventListener('drop', (e)=>{
   e.preventDefault();
   const f = e.dataTransfer.files && e.dataTransfer.files[0];
   if(f){
+    showLoading(true);
     const url = URL.createObjectURL(f);
-    loadImage(url).then(()=> URL.revokeObjectURL(url));
+    loadImage(url).then(()=>{ 
+        URL.revokeObjectURL(url);
+        showLoading(false);
+    });
   }
 });
 
@@ -651,21 +735,10 @@ function drawPlaceholder(){
   ctx.fillStyle = '#ddd';
   ctx.font = '16px system-ui, -apple-system';
   ctx.textAlign = 'center';
-  ctx.fillText('「写真を選ぶ」か ↓ に画像をドラッグ＆ドロップ', w/2, h/2 - 10);
+  ctx.fillText('「写真を選ぶ」をタップしてください', w/2, h/2);
 }
 drawPlaceholder();
 
-/* Keyboard nav */
-filterBar.addEventListener('keydown', (e)=>{
-  if(e.key === 'ArrowRight') {
-    const next = document.activeElement.nextElementSibling;
-    next && next.focus();
-  }
-  if(e.key === 'ArrowLeft') {
-    const prev = document.activeElement.previousElementSibling;
-    prev && prev.focus();
-  }
-});
 </script>
 </body>
 </html>
