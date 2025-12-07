@@ -184,6 +184,33 @@
     object-fit:cover;
   }
 
+/* --- スクロールバーのカスタマイズをここから挿入 --- */
+
+  /* 1. スクロールバー全体のサイズを定義 */
+  #filterBar::-webkit-scrollbar {
+    width: 8px; /* 縦スクロールの場合の幅 */
+    height: 12px; /* 横スクロールの場合の高さ (つまみを太くする値) */
+  }
+
+  /* 2. トラック（溝）のスタイルを定義 */
+  #filterBar::-webkit-scrollbar-track {
+    background: rgba(0,0,0,0.1); /* 薄い背景色 */
+    border-radius: 10px;
+  }
+
+  /* 3. つまみ（サム）のスタイルを定義 */
+  #filterBar::-webkit-scrollbar-thumb {
+    background: var(--accent); /* テーマカラー (青) を適用 */
+    border-radius: 10px; 
+  }
+
+  /* 4. ホバー時のつまみの色 */
+  #filterBar::-webkit-scrollbar-thumb:hover {
+    background: #0f4392; /* 少し濃い色 */
+  }
+
+/* --- スクロールバーのカスタマイズの挿入はここまで --- */
+  
   @media (max-width:520px){
     .btn-row{flex-direction:column;}
     .filterItem{min-width:72px;padding:6px;font-size:12px;}
@@ -742,4 +769,5 @@ drawPlaceholder();
 </script>
 </body>
 </html>
+
 
