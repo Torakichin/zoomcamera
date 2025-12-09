@@ -3,19 +3,20 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>写真加工アプリ</title>
+<title>レトロ写真加工アプリ</title>
+<link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
 <style>
   :root{
     --bg:#0f1720;
     --card:#ffffff;
     --muted:#6b7280;
-    --accent:#1565d8;
+    --accent:#d97706; /* レトロなアンバー色 */
     --safe-pad:16px;
   }
   html,body{height:100%;margin:0;}
   body{
-    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Noto Sans JP", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
-    background: linear-gradient(180deg,#0f1720 0%, #071029 100%);
+    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Noto Sans JP", sans-serif;
+    background: linear-gradient(180deg,#1c1917 0%, #0f1720 100%);
     color:#0b1220;
     display:flex;
     align-items:flex-start;
@@ -29,7 +30,7 @@
     max-width:920px;
     background: #fff;
     border-radius:14px;
-    box-shadow: 0 8px 30px rgba(2,6,23,0.45);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.5);
     padding:18px;
     box-sizing:border-box;
     position: relative;
@@ -48,7 +49,7 @@
     justify-content: center;
     font-weight: bold;
     color: var(--accent);
-    display: none; /* hidden by default */
+    display: none;
   }
   .spinner {
     width: 40px; height: 40px;
@@ -66,16 +67,13 @@
     justify-content:space-between;
     gap:12px;
   }
-  h1{font-size:18px;margin:0;}
+  h1{font-size:18px;margin:0; font-weight:800; color:#333;}
   .controls-top{
     display:flex;
     gap:10px;
     align-items:center;
   }
-  /* 重要: acceptを具体的に指定することでiOSに変換を強制させる */
-  #fileInput{
-    appearance:none;
-  }
+  #fileInput{ appearance:none; }
 
   .main {
     margin-top:14px;
@@ -87,42 +85,78 @@
 
   .canvas-wrap{
     width:100%;
-    background:#111;
+    background:#222;
     border-radius:10px;
     padding:8px;
     display:flex;
     align-items:center;
     justify-content:center;
     min-height: 200px;
+    box-shadow: inset 0 0 20px #000;
   }
 
   canvas{
     max-width:100%;
     width:100%;
     height:auto;
-    border-radius:8px;
+    border-radius:4px;
     background:#ddd;
     touch-action: manipulation;
   }
 
+  /* スライダーエリア */
   .slider-row{
     width:100%;
     display:flex;
     flex-direction:column;
     align-items:center;
     gap:6px;
+    margin-bottom: 5px;
   }
-
   .slider-row label{
     font-size:14px;color:var(--muted);
     display:flex;
     align-items:center;
     gap:8px;
   }
-
   .range{
     width:90%;
     max-width:540px;
+    accent-color: var(--accent);
+  }
+
+  /* 日付設定エリア (New) */
+  .date-settings {
+    width: 100%;
+    background: #f3f4f6;
+    border-radius: 10px;
+    padding: 12px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 5px;
+  }
+  .date-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+    font-size: 14px;
+  }
+  .date-row label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+  }
+  .date-row input[type="date"], .date-row select {
+    padding: 6px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 14px;
+    background: #fff;
   }
 
   .btn-row{
@@ -141,9 +175,13 @@
     border-radius:10px;
     font-size:15px;
     cursor:pointer;
-    box-shadow:0 4px 10px rgba(21,101,216,0.18);
+    box-shadow:0 4px 10px rgba(0,0,0,0.2);
     text-align: center;
+    font-weight: bold;
+    transition: transform 0.1s;
   }
+  button:active, .file-btn:active{ transform:scale(0.98); }
+  
   button.secondary{
     background:#e6e6e6;
     color:#0b1220;
@@ -156,81 +194,69 @@
     gap:10px;
     overflow-x:auto;
     padding:10px;
-    background:linear-gradient(180deg, rgba(0,0,0,0.03), rgba(0,0,0,0.01));
+    background:#f9f9f9;
     border-radius:10px;
     width: 100%;
     box-sizing: border-box;
+    border: 1px solid #eee;
   }
   .filterItem{
     min-width:82px;
     flex:0 0 auto;
     background:#fff;
     border-radius:10px;
-    border:1px solid #eee;
-    padding:8px;
+    border:2px solid transparent;
+    padding:6px;
     box-sizing:border-box;
     text-align:center;
-    font-size:13px;
-    color:#222;
+    font-size:12px;
+    color:#444;
     cursor:pointer;
     user-select:none;
+    transition: all 0.2s;
   }
+  .filterItem:hover{ background:#f0f0f0; }
   .filterItem.active{
     border-color:var(--accent);
-    box-shadow:0 6px 18px rgba(21,101,216,0.12);
+    background:#fff7ed;
+    color: var(--accent);
+    font-weight: bold;
+    transform: translateY(-2px);
+    box-shadow:0 4px 12px rgba(0,0,0,0.1);
   }
   .thumb{
     width:64px;height:48px;border-radius:6px;background:#ddd;margin:0 auto 6px auto; display:block;
     object-fit:cover;
   }
 
-/* --- スクロールバーのカスタマイズをここから挿入 --- */
+  /* Custom Scrollbar */
+  #filterBar::-webkit-scrollbar { width: 8px; height: 12px; }
+  #filterBar::-webkit-scrollbar-track { background: transparent; }
+  #filterBar::-webkit-scrollbar-thumb { background: #ccc; border-radius: 30px; border: 3px solid transparent; background-clip: content-box;}
+  #filterBar::-webkit-scrollbar-thumb:hover { background-color: var(--accent); }
 
-  /* 1. スクロールバー全体のサイズを定義 */
-  #filterBar::-webkit-scrollbar {
-    width: 8px; /* 縦スクロールの場合の幅 */
-    height: 50px; /* 横スクロールの場合の高さ (つまみを太くする値) */
-  }
-
-  /* 2. トラック（溝）のスタイルを定義 */
-  #filterBar::-webkit-scrollbar-track {
-    background: rgba(0,0,0,0.1); /* 薄い背景色 */
-    border-radius: 10px;
-  }
-
-  /* 3. つまみ（サム）のスタイルを定義 */
-  #filterBar::-webkit-scrollbar-thumb {
-    background: var(--accent); /* テーマカラー (青) を適用 */
-    border-radius: 30px; 
-  }
-
-  /* 4. ホバー時のつまみの色 */
-  #filterBar::-webkit-scrollbar-thumb:hover {
-    background: #0f4392; /* 少し濃い色 */
-  }
-
-/* --- スクロールバーのカスタマイズの挿入はここまで --- */
-  
   @media (max-width:520px){
     .btn-row{flex-direction:column;}
-    .filterItem{min-width:72px;padding:6px;font-size:12px;}
+    .filterItem{min-width:72px;padding:6px;font-size:11px;}
     .thumb{width:56px;height:40px;}
+    .date-row { flex-direction: column; align-items: stretch; }
+    .date-row > * { width: 100%; box-sizing: border-box; }
   }
 
-  footer{margin-top:12px;font-size:12px;color:var(--muted);text-align:center}
+  footer{margin-top:12px;font-size:11px;color:var(--muted);text-align:center}
 </style>
 </head>
 <body>
   <div class="app" role="application" aria-label="写真フィルタアプリ">
     <div id="loadingOverlay">
       <div class="spinner"></div>
-      <div id="loadingText">画像を処理中...</div>
+      <div id="loadingText">Processing...</div>
     </div>
 
     <header>
-      <h1>写真加工アプリ</h1>
+      <h1>Retro Cam</h1>
       <div class="controls-top">
-        <label class="file-btn" for="fileInput" title="写真を選択">写真を選ぶ</label>
+        <label class="file-btn" for="fileInput" title="写真を選択">＋ 写真</label>
         <input id="fileInput" type="file" accept="image/jpeg, image/png" style="display:none">
       </div>
     </header>
@@ -241,8 +267,25 @@
       </div>
 
       <div class="slider-row" id="sliderRow" style="display:none">
-        <label id="sliderLabel">強度：<strong id="sliderValue">1.00</strong></label>
-        <input id="strengthSlider" class="range" type="range" min="0" max="1" step="0.01" value="1">
+        <label id="sliderLabel">エフェクト強度：<strong id="sliderValue">1.00</strong></label>
+        <input id="strengthSlider" class="range" type="range" min="0" max="1" step="0.05" value="1">
+      </div>
+
+      <div class="date-settings">
+        <div class="date-row">
+            <label style="font-weight:bold;">
+                <input type="checkbox" id="dateToggle"> 日付を入れる
+            </label>
+        </div>
+        <div class="date-row" id="dateOptions" style="display:none;">
+            <input type="date" id="dateInput">
+            <select id="datePosition">
+                <option value="br" selected>右下 (Bottom-Right)</option>
+                <option value="bl">左下 (Bottom-Left)</option>
+                <option value="tr">右上 (Top-Right)</option>
+                <option value="tl">左上 (Top-Left)</option>
+            </select>
+        </div>
       </div>
 
       <div class="btn-row">
@@ -270,22 +313,53 @@ const downloadBtn = document.getElementById('downloadBtn');
 const resetBtn = document.getElementById('resetBtn');
 const loadingOverlay = document.getElementById('loadingOverlay');
 
+// Date Stamp DOM
+const dateToggle = document.getElementById('dateToggle');
+const dateOptions = document.getElementById('dateOptions');
+const dateInput = document.getElementById('dateInput');
+const datePosition = document.getElementById('datePosition');
+
 let originalImageData = null;
-let originalImg = null;
 let currentFilter = 'original';
-let thumbWidth = 128, thumbHeight = 80;
+let thumbWidth = 100, thumbHeight = 64; 
 
 /* --------- UI Helpers ---------- */
 function showLoading(show){
   loadingOverlay.style.display = show ? 'flex' : 'none';
 }
 
-/* --------- Filters definition --------- */
+/* Set Today's Date */
+const today = new Date();
+const yyyy = today.getFullYear();
+const mm = String(today.getMonth() + 1).padStart(2, '0');
+const dd = String(today.getDate()).padStart(2, '0');
+dateInput.value = `${yyyy}-${mm}-${dd}`;
+
+/* Date Toggle Logic */
+dateToggle.addEventListener('change', ()=>{
+    dateOptions.style.display = dateToggle.checked ? 'flex' : 'none';
+    requestRender();
+});
+dateInput.addEventListener('change', requestRender);
+datePosition.addEventListener('change', requestRender);
+
+function requestRender(){
+    if(!originalImageData) return;
+    // Debounce wrapper is mainly on slider, but direct calls are fine here
+    showLoading(true);
+    requestAnimationFrame(async ()=>{
+        await renderCurrent();
+        showLoading(false);
+    });
+}
+
+/* --------- Filters Definition ---------- */
 const filters = [
   { id:'original', name:'Original' },
-  { id:'sepia', name:'セピア' },
-  { id:'retro', name:'レトロ風' },
-  { id:'mini', name:'ミニチュア' }
+  { id:'1920s', name:'1920s\nSilent' },
+  { id:'1950s', name:'1950s\nVintage' },
+  { id:'1970s', name:'1970s\nWarm' },
+  { id:'1980s', name:'1980s\nVHS' }
 ];
 
 function createFilterBar(){
@@ -302,7 +376,7 @@ function createFilterBar(){
     img.style.display = 'block';
 
     const label = document.createElement('div');
-    label.textContent = f.name;
+    label.innerText = f.name;
 
     item.appendChild(img);
     item.appendChild(label);
@@ -311,15 +385,7 @@ function createFilterBar(){
     item.addEventListener('click', ()=> {
       if(!originalImageData) return;
       setActiveFilter(f.id);
-      // use setTimeout to allow UI to update active class before heavy render
-      setTimeout(()=>{
-        showLoading(true);
-        // tiny delay to render loader
-        requestAnimationFrame(async ()=>{
-            await renderCurrent();
-            showLoading(false);
-        });
-      }, 10);
+      requestRender();
     });
   });
 }
@@ -334,14 +400,22 @@ function setActiveFilter(id){
     sliderRow.style.display = 'none';
   } else {
     sliderRow.style.display = 'flex';
-    if(id === 'sepia') sliderLabel.innerHTML = 'セピア強度：<strong id="sliderValue">'+Number(strengthSlider.value).toFixed(2)+'</strong>';
-    else if(id === 'retro') sliderLabel.innerHTML = 'レトロ度：<strong id="sliderValue">'+Number(strengthSlider.value).toFixed(2)+'</strong>';
-    else if(id === 'mini') sliderLabel.innerHTML = 'ミニチュア度：<strong id="sliderValue">'+Number(strengthSlider.value).toFixed(2)+'</strong>';
-    
-    // rebind ref
-    sliderValueRef = document.getElementById('sliderValue');
-    sliderValueRef.textContent = Number(strengthSlider.value).toFixed(2);
+    // If resetting slider on change is desired:
+    // if(strengthSlider.value == 0) strengthSlider.value = 1.0;
+    updateSliderLabel(strengthSlider.value);
   }
+}
+
+function updateSliderLabel(val){
+    const v = Number(val).toFixed(2);
+    sliderValue.textContent = v;
+    let text = "強度";
+    if(currentFilter === '1920s') text = "ノイズ強度";
+    else if(currentFilter === '1950s') text = "色褪せ度";
+    else if(currentFilter === '1970s') text = "暖色強調";
+    else if(currentFilter === '1980s') text = "走査線強度";
+    
+    sliderLabel.innerHTML = `${text}：<strong id="sliderValue">${v}</strong>`;
 }
 
 /* --------- Image Load Logic ---------- */
@@ -350,16 +424,13 @@ fileInput.addEventListener('change', async (e)=>{
   if(!file) return;
 
   showLoading(true);
-  
-  // Create object URL
   const url = URL.createObjectURL(file);
   
   try {
     await loadImage(url);
-    // iOS sometimes retains file input value, clear it to allow re-selection of same file
     fileInput.value = ''; 
   } catch(err) {
-    alert('画像の読み込みに失敗しました。別の画像をお試しください。');
+    alert('画像の読み込みに失敗しました。');
     console.error(err);
   } finally {
     URL.revokeObjectURL(url);
@@ -371,8 +442,6 @@ function loadImage(src){
   return new Promise((res,rej)=>{
     const img = new Image();
     img.onload = ()=>{
-      originalImg = img;
-      // limit size to 1200px (Performance on iOS)
       const maxW = 1200;
       let w = img.naturalWidth, h = img.naturalHeight;
       if(w > maxW){
@@ -385,8 +454,11 @@ function loadImage(src){
       originalImageData = ctx.getImageData(0,0,canvas.width, canvas.height);
       
       updateAllThumbnails();
-      setActiveFilter('sepia'); 
-      renderCurrent();
+      setActiveFilter('1950s'); // Default
+      dateToggle.checked = true; // Default ON for retro feel
+      dateOptions.style.display = 'flex';
+      
+      requestRender();
       res();
     };
     img.onerror = (e) => rej(e);
@@ -394,303 +466,250 @@ function loadImage(src){
   });
 }
 
-/* --------- Utility functions ---------- */
+/* --------- Helper Functions ---------- */
 function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
 
 function copyImageData(src){
   return new ImageData(new Uint8ClampedArray(src.data), src.width, src.height);
 }
 
-/* --------- Manual Blur Implementation for iOS Support ---------- */
-/* ブラウザの filter = 'blur()' はiOS Safariでバグが多いため、
-   JavaScriptによる手動Box Blur(近似ガウス)を実装します。
-   3回通すことでガウスぼかしに近づけます。
-*/
-function boxBlurH(scl, tcl, w, h, r) {
-    var iarr = 1 / (r+r+1);
-    for(var i=0; i<h; i++) {
-        var ti = i*w, li = ti, ri = ti+r;
-        var fv = scl[ti], lv = scl[ti+w-1], val = (r+1)*fv;
-        for(var j=0; j<r; j++) val += scl[ti+j];
-        for(var j=0  ; j<=r ; j++) { val += scl[ri++] - fv       ; tcl[ti++] = Math.round(val*iarr); }
-        for(var j=r+1; j<w-r; j++) { val += scl[ri++] - scl[li++]; tcl[ti++] = Math.round(val*iarr); }
-        for(var j=w-r; j<w  ; j++) { val += lv        - scl[li++]; tcl[ti++] = Math.round(val*iarr); }
-    }
-}
-function boxBlurT(scl, tcl, w, h, r) {
-    var iarr = 1 / (r+r+1);
-    for(var i=0; i<w; i++) {
-        var ti = i, li = ti, ri = ti+r*w;
-        var fv = scl[ti], lv = scl[ti+w*(h-1)], val = (r+1)*fv;
-        for(var j=0; j<r; j++) val += scl[ti+j*w];
-        for(var j=0  ; j<=r ; j++) { val += scl[ri] - fv     ; tcl[ti] = Math.round(val*iarr); ri+=w; ti+=w; }
-        for(var j=r+1; j<h-r; j++) { val += scl[ri] - scl[li]; tcl[ti] = Math.round(val*iarr); li+=w; ri+=w; ti+=w; }
-        for(var j=h-r; j<h  ; j++) { val += lv      - scl[li]; tcl[ti] = Math.round(val*iarr); li+=w; ti+=w; }
-    }
-}
-function boxBlur(scl, tcl, w, h, r) {
-    for(var i=0; i<scl.length; i++) tcl[i] = scl[i];
-    boxBlurH(tcl, scl, w, h, r);
-    boxBlurT(scl, tcl, w, h, r);
-}
-// Apply Box Blur to ImageData (only RGB, ignores Alpha for simplicity or copies it)
-function applyManualBlur(imageData, radius) {
-    // 整数半径
-    var r = Math.round(radius);
-    if(r < 1) return copyImageData(imageData);
+/* Vignette */
+function applyVignette(data, width, height, strength){
+  const cx = width/2;
+  const cy = height/2;
+  const maxDist = Math.sqrt(cx*cx + cy*cy);
+  const power = 0.6 * strength; 
 
-    var w = imageData.width;
-    var h = imageData.height;
-    var data = new Uint8ClampedArray(imageData.data); // Copy
-    
-    // Separate channels for processing
-    var rCh = new Uint8Array(w*h);
-    var gCh = new Uint8Array(w*h);
-    var bCh = new Uint8Array(w*h);
-    
-    for(var i=0; i<w*h; i++) {
-        rCh[i] = data[i*4];
-        gCh[i] = data[i*4+1];
-        bCh[i] = data[i*4+2];
+  for(let y=0; y<height; y++){
+    for(let x=0; x<width; x++){
+      const i = (y*width + x)*4;
+      const dx = x - cx;
+      const dy = y - cy;
+      const d = Math.sqrt(dx*dx + dy*dy) / maxDist;
+      const v = 1 - Math.pow(d, 2.5) * power;
+      
+      data[i]   = clamp(data[i] * v, 0, 255);
+      data[i+1] = clamp(data[i+1] * v, 0, 255);
+      data[i+2] = clamp(data[i+2] * v, 0, 255);
     }
-    
-    // Temp buffers
-    var rT = new Uint8Array(w*h);
-    var gT = new Uint8Array(w*h);
-    var bT = new Uint8Array(w*h);
-
-    // 2 passes for smoother look
-    boxBlur(rCh, rT, w, h, r);
-    boxBlur(gCh, gT, w, h, r);
-    boxBlur(bCh, bT, w, h, r);
-    
-    boxBlur(rCh, rT, w, h, r);
-    boxBlur(gCh, gT, w, h, r);
-    boxBlur(bCh, bT, w, h, r);
-
-    // Write back
-    var out = new ImageData(w, h);
-    var od = out.data;
-    for(var i=0; i<w*h; i++) {
-        od[i*4]   = rCh[i];
-        od[i*4+1] = gCh[i];
-        od[i*4+2] = bCh[i];
-        od[i*4+3] = data[i*4+3]; // preserve alpha
-    }
-    return out;
+  }
 }
 
+/* --------- Filter Logic ---------- */
 
-/* --------- Core Filter Logic ---------- */
-
-/* Sepia */
-function applySepiaToImageData(srcImageData, strength){
-  const img = copyImageData(srcImageData);
+/* 1920s */
+function apply1920s(src, strength){
+  const img = copyImageData(src);
   const d = img.data;
-  for(let i=0;i<d.length;i+=4){
-    const r = d[i], g = d[i+1], b = d[i+2];
-    const sr = (r * .393) + (g * .769) + (b * .189);
-    const sg = (r * .349) + (g * .686) + (b * .168);
-    const sb = (r * .272) + (g * .534) + (b * .131);
-    d[i]   = r * (1-strength) + sr * strength;
-    d[i+1] = g * (1-strength) + sg * strength;
-    d[i+2] = b * (1-strength) + sb * strength;
+  const noiseAmount = 60 * strength;
+  const contrast = 1.0 + (0.5 * strength);
+  const factor = (259 * (contrast + 255)) / (255 * (259 - contrast));
+
+  for(let i=0; i<d.length; i+=4){
+    let r = d[i], g = d[i+1], b = d[i+2];
+    let gray = 0.299*r + 0.587*g + 0.114*b;
+    gray = factor * (gray - 128) + 128;
+    gray += (Math.random() - 0.5) * noiseAmount;
+    gray = clamp(gray, 0, 255);
+    d[i] = d[i+1] = d[i+2] = gray;
   }
   return img;
 }
 
-/* Retro */
-function applyRetroToImageData(srcImageData, strength){
-  const width = srcImageData.width, height = srcImageData.height;
-  const img = copyImageData(srcImageData);
+/* 1950s */
+function apply1950s(src, strength){
+  const img = copyImageData(src);
   const d = img.data;
-  const cx = width/2, cy = height/2;
-  const maxDist = Math.sqrt(cx*cx + cy*cy);
-  const desatAmount = 0.5 * strength;
-  const grainAmount = 20 * strength;
-  const vignettePower = 0.9 * strength;
-  
-  for(let y=0;y<height;y++){
-    for(let x=0;x<width;x++){
-      const i = (y*width + x)*4;
-      let r = d[i], g = d[i+1], b = d[i+2];
-      const lum = 0.299*r + 0.587*g + 0.114*b;
-      r = r*(1-desatAmount) + lum*desatAmount;
-      g = g*(1-desatAmount) + lum*desatAmount;
-      b = b*(1-desatAmount) + lum*desatAmount;
-      
-      const sr = (r * 0.35) + (g * 0.65) + (b * 0.12);
-      const sg = (r * 0.25) + (g * 0.6)  + (b * 0.08);
-      const sb = (r * 0.12) + (g * 0.35) + (b * 0.05);
-      
-      r = r*(0.6) + sr*0.4;
-      g = g*(0.6) + sg*0.4;
-      b = b*(0.6) + sb*0.4;
-      
-      const gRand = (Math.random()-0.5) * grainAmount;
-      r += gRand; g += gRand; b += gRand;
-      
-      const dx = x-cx, dy = y-cy;
-      const dnorm = Math.sqrt(dx*dx + dy*dy) / maxDist;
-      const v = 1 - Math.pow(Math.min(1, dnorm), 2.0 * (1 + vignettePower));
-      r *= v; g *= v; b *= v;
-      
-      d[i] = clamp(Math.round(r), 0, 255);
-      d[i+1] = clamp(Math.round(g), 0, 255);
-      d[i+2] = clamp(Math.round(b), 0, 255);
-    }
-  }
-  // blend original
-  const out = copyImageData(srcImageData);
-  const od = out.data;
-  for(let i=0;i<od.length;i+=4){
-    od[i]   = od[i]   * (1 - strength) + d[i]   * strength;
-    od[i+1] = od[i+1] * (1 - strength) + d[i+1] * strength;
-    od[i+2] = od[i+2] * (1 - strength) + d[i+2] * strength;
-    od[i+3] = d[i+3];
-  }
-  return out;
-}
+  const w = img.width, h = img.height;
 
-/* Miniature - Vividness + Manual Blur */
-function applyVividness(srcImageData) {
-  const w = srcImageData.width, h = srcImageData.height;
-  const out = copyImageData(srcImageData);
-  const d = out.data;
-  
-  // Contrast & Saturation constants
-  const contrast = 1.2; 
-  const saturation = 1.4; 
-
-  for(let i=0; i<d.length; i+=4) {
+  for(let i=0; i<d.length; i+=4){
     let r = d[i], g = d[i+1], b = d[i+2];
-
-    // 1. Contrast
-    r = (r - 128) * contrast + 128;
-    g = (g - 128) * contrast + 128;
-    b = (b - 128) * contrast + 128;
-    
-    r = clamp(r, 0, 255); g = clamp(g, 0, 255); b = clamp(b, 0, 255);
-
-    // 2. Saturation
-    const gray = 0.2126*r + 0.7152*g + 0.0722*b;
-    r = gray + (r - gray) * saturation;
-    g = gray + (g - gray) * saturation;
-    b = gray + (b - gray) * saturation;
-
-    d[i] = clamp(r, 0, 255); d[i+1] = clamp(g, 0, 255); d[i+2] = clamp(b, 0, 255);
+    const gray = 0.299*r + 0.587*g + 0.114*b;
+    const desat = 0.4 * strength; 
+    r = r*(1-desat) + gray*desat;
+    g = g*(1-desat) + gray*desat;
+    b = b*(1-desat) + gray*desat;
+    r = r * (1 + 0.15 * strength);
+    g = g * (1 + 0.05 * strength);
+    b = b * (1 - 0.15 * strength);
+    d[i] = clamp(r, 0, 255);
+    d[i+1] = clamp(g, 0, 255);
+    d[i+2] = clamp(b, 0, 255);
   }
-  return out;
+  applyVignette(d, w, h, strength * 1.5);
+  return img;
 }
 
-/* Main Miniature Function */
-async function applyMiniature(srcImageData, strength) {
-  // 1. Vivid
-  const vividData = applyVividness(srcImageData);
-  const w = vividData.width, h = vividData.height;
+/* 1970s */
+function apply1970s(src, strength){
+  const img = copyImageData(src);
+  const d = img.data;
+  const noiseAmt = 30 * strength;
 
-  // 2. Manual Blur (Replacing ctx.filter)
-  const maxBlur = 6.0; 
-  const blurRadius = Math.max(1, maxBlur * strength); 
-  
-  // ブラウザAPIを使わずJSで計算（iOS対応）
-  const blurredData = applyManualBlur(vividData, blurRadius);
-  
-  // 3. Alpha Blend
-  const out = copyImageData(vividData);
-  const od = out.data;
-  const sd = vividData.data; 
-  const bd = blurredData.data; 
-  
-  const centerY = h / 2;
-  const sharpBandWidth = h * (0.35 - 0.15 * strength); 
-  const transitionWidth = h * 0.15; 
-  
-  for(let y=0; y<h; y++){
-    const dist = Math.abs(y - centerY);
-    let alpha = 0;
-    
-    if(dist < sharpBandWidth / 2) {
-      alpha = 1;
-    } else {
-      const distBeyond = dist - (sharpBandWidth / 2);
-      const t = 1 - (distBeyond / transitionWidth);
-      alpha = clamp(t, 0, 1);
-      alpha = alpha * alpha * (3 - 2 * alpha);
+  for(let i=0; i<d.length; i+=4){
+    let r = d[i], g = d[i+1], b = d[i+2];
+    const gray = 0.299*r + 0.587*g + 0.114*b;
+    const sat = 1.3 * strength; 
+    if(strength > 0){
+        r = gray + (r - gray) * sat;
+        g = gray + (g - gray) * sat;
+        b = gray + (b - gray) * sat;
     }
-    
-    for(let x=0; x<w; x++){
-      const i = (y*w + x)*4;
-      if(alpha >= 0.99) {
-        od[i] = sd[i]; od[i+1] = sd[i+1]; od[i+2] = sd[i+2];
-      } else if(alpha <= 0.01) {
-        od[i] = bd[i]; od[i+1] = bd[i+1]; od[i+2] = bd[i+2];
-      } else {
-        od[i]   = sd[i]*alpha + bd[i]*(1-alpha);
-        od[i+1] = sd[i+1]*alpha + bd[i+1]*(1-alpha);
-        od[i+2] = sd[i+2]*alpha + bd[i+2]*(1-alpha);
-      }
-      od[i+3] = 255;
-    }
+    r *= (1 + 0.1 * strength);
+    b *= (1 - 0.1 * strength);
+    const rand = (Math.random() - 0.5) * noiseAmt;
+    r += rand; g += rand; b += rand;
+    d[i] = clamp(r, 0, 255);
+    d[i+1] = clamp(g, 0, 255);
+    d[i+2] = clamp(b, 0, 255);
   }
-  return out;
+  return img;
 }
+
+/* 1980s */
+function apply1980s(src, strength){
+  const img = copyImageData(src);
+  const d = img.data;
+  const w = img.width;
+  const noiseAmt = 40 * strength;
+  const scanlineInt = 4;
+
+  for(let i=0; i<d.length; i+=4){
+    let r = d[i], g = d[i+1], b = d[i+2];
+    const pixelIndex = i / 4;
+    const y = Math.floor(pixelIndex / w);
+    r *= (1 + 0.05 * strength);
+    b *= (1 + 0.1 * strength);
+    if(y % scanlineInt === 0){
+        const darken = 0.15 * strength; 
+        r *= (1 - darken);
+        g *= (1 - darken);
+        b *= (1 - darken);
+    }
+    const rand = (Math.random() - 0.5) * noiseAmt;
+    r += rand; g += rand; b += rand + (rand * 0.5);
+    d[i] = clamp(r, 0, 255);
+    d[i+1] = clamp(g, 0, 255);
+    d[i+2] = clamp(b, 0, 255);
+  }
+  return img;
+}
+
 
 /* --------- Render logic ---------- */
-let sliderValueRef = sliderValue;
-
 async function renderCurrent(){
   if(!originalImageData) return;
   const strength = parseFloat(strengthSlider.value);
-  andShowSliderVal(strength);
+  updateSliderLabel(strength);
   
-  // Use setTimeout to ensure UI remains responsive during heavy calc
   return new Promise(resolve => {
-    setTimeout(async () => {
-        if(currentFilter === 'original'){
-            ctx.putImageData(originalImageData, 0, 0);
-        } else if(currentFilter === 'sepia'){
-            const out = applySepiaToImageData(originalImageData, strength);
-            ctx.putImageData(out, 0, 0);
-        } else if(currentFilter === 'retro'){
-            const out = applyRetroToImageData(originalImageData, strength);
-            ctx.putImageData(out, 0, 0);
-        } else if(currentFilter === 'mini'){
-            const out = await applyMiniature(originalImageData, strength);
-            ctx.putImageData(out, 0, 0);
+    setTimeout(() => {
+        let out = originalImageData;
+        
+        // 1. Apply Filter
+        if(currentFilter === '1920s'){
+            out = apply1920s(originalImageData, strength);
+        } else if(currentFilter === '1950s'){
+            out = apply1950s(originalImageData, strength);
+        } else if(currentFilter === '1970s'){
+            out = apply1970s(originalImageData, strength);
+        } else if(currentFilter === '1980s'){
+            out = apply1980s(originalImageData, strength);
         }
+        
+        ctx.putImageData(out, 0, 0);
+
+        // 2. Apply Date Stamp (If enabled)
+        if(dateToggle.checked){
+            drawDateStamp();
+        }
+
         resolve();
     }, 0);
   });
 }
 
-function andShowSliderVal(v){
-  if(!sliderValueRef){
-    sliderValueRef = document.getElementById('sliderValue');
-  }
-  sliderValueRef.textContent = Number(v).toFixed(2);
+function drawDateStamp(){
+    const dateVal = dateInput.value; // yyyy-mm-dd
+    if(!dateVal) return;
+    
+    // Replace Hyphens with Dots
+    const text = dateVal.replace(/-/g, '.'); // 2025.12.09
+
+    const w = canvas.width;
+    const h = canvas.height;
+    
+    // Font settings relative to image size
+    // Using a digital-style font 'VT323'
+    const fontSize = Math.max(16, Math.floor(h * 0.05)); 
+    const paddingX = Math.floor(w * 0.04);
+    const paddingY = Math.floor(h * 0.04);
+
+    ctx.save();
+    
+    ctx.font = `${fontSize}px 'VT323', monospace`;
+    ctx.textBaseline = 'bottom';
+    
+    // Retro Digital Orange Color
+    const color = '#ff9900'; 
+    ctx.fillStyle = color;
+    
+    // Add Glow effect
+    ctx.shadowColor = '#ff5500';
+    ctx.shadowBlur = fontSize * 0.4;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
+
+    // Positioning
+    const pos = datePosition.value;
+    let x, y;
+
+    if(pos === 'br'){ // Bottom Right
+        ctx.textAlign = 'right';
+        x = w - paddingX;
+        y = h - paddingY;
+    } else if(pos === 'bl'){ // Bottom Left
+        ctx.textAlign = 'left';
+        x = paddingX;
+        y = h - paddingY;
+    } else if(pos === 'tr'){ // Top Right
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'top';
+        x = w - paddingX;
+        y = paddingY;
+    } else if(pos === 'tl'){ // Top Left
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        x = paddingX;
+        y = paddingY;
+    }
+
+    // Draw text
+    // Optional: Draw slightly transparent to blend better
+    ctx.globalAlpha = 0.85;
+    // Composite mode for "light emission" feel (optional, 'source-over' is safer)
+    // ctx.globalCompositeOperation = 'screen'; 
+    
+    ctx.fillText(text, x, y);
+
+    ctx.restore();
 }
 
-/* Debounce for slider to prevent freezing while dragging */
+/* Debounce for slider */
 let renderTimeout;
 strengthSlider.addEventListener('input', ()=>{
-  andShowSliderVal(strengthSlider.value);
+  updateSliderLabel(strengthSlider.value);
   clearTimeout(renderTimeout);
   renderTimeout = setTimeout(()=>{
-      showLoading(true);
-      requestAnimationFrame(async ()=>{
-          await renderCurrent();
-          showLoading(false);
-      });
+      requestRender();
   }, 100);
 });
 
 downloadBtn.addEventListener('click', ()=>{
-  if(!originalImageData) return alert('まずは画像を選択してください');
-  const url = canvas.toDataURL('image/jpeg', 0.85);
+  if(!originalImageData) return alert('画像を選択してください');
   const a = document.createElement('a');
-  a.href = url;
-  a.download = `${currentFilter || 'image'}_edited.jpg`;
+  a.href = canvas.toDataURL('image/jpeg', 0.85);
+  a.download = `retro_${currentFilter}_edited.jpg`;
   a.click();
 });
 
@@ -698,46 +717,46 @@ resetBtn.addEventListener('click', ()=>{
   if(!originalImageData) return;
   strengthSlider.value = 1;
   setActiveFilter('original');
-  renderCurrent();
+  dateToggle.checked = false; // Reset date
+  dateOptions.style.display = 'none';
+  requestRender();
 });
 
+/* Create thumbnails with current filters (Thumbnails don't need date stamp) */
 function updateAllThumbnails(){
-  // Create scaled down temp image
   const iw = originalImageData.width, ih = originalImageData.height;
   const tmp = document.createElement('canvas');
   tmp.width = iw; tmp.height = ih;
   tmp.getContext('2d').putImageData(originalImageData,0,0);
   
-  const items = document.querySelectorAll('.filterItem');
-  items.forEach(async (el, idx)=>{
+  const smallC = document.createElement('canvas');
+  smallC.width = thumbWidth; smallC.height = thumbHeight;
+  const sCtx = smallC.getContext('2d');
+  sCtx.drawImage(tmp, 0, 0, iw, ih, 0, 0, thumbWidth, thumbHeight);
+  const smallData = sCtx.getImageData(0,0,thumbWidth,thumbHeight);
+
+  document.querySelectorAll('.filterItem').forEach((el)=>{
     const canvasThumb = el.querySelector('canvas');
+    if(!canvasThumb) return;
     const ctxT = canvasThumb.getContext('2d');
-    const tw = canvasThumb.width, th = canvasThumb.height;
+    const fId = el.dataset.filter;
     
-    ctxT.clearRect(0,0,tw,th);
-    ctxT.drawImage(tmp, 0,0, iw, ih, 0,0, tw, th);
+    let out = smallData;
+    if(fId === '1920s') out = apply1920s(smallData, 1.0);
+    else if(fId === '1950s') out = apply1950s(smallData, 1.0);
+    else if(fId === '1970s') out = apply1970s(smallData, 1.0);
+    else if(fId === '1980s') out = apply1980s(smallData, 1.0);
     
-    const filterId = el.dataset.filter;
-    const idata = ctxT.getImageData(0,0,tw,th);
-    
-    if(filterId === 'sepia'){
-      const out = applySepiaToImageData(idata, 1.0);
-      ctxT.putImageData(out,0,0);
-    } else if(filterId === 'retro'){
-      const out = applyRetroToImageData(idata, 1.0);
-      ctxT.putImageData(out,0,0);
-    } else if(filterId === 'mini'){
-      const out = await applyMiniature(idata, 1.0);
-      ctxT.putImageData(out,0,0);
-    }
+    ctxT.putImageData(out,0,0);
   });
 }
 
-/* initialize UI */
+/* Init */
 createFilterBar();
 setActiveFilter('original');
+drawPlaceholder();
 
-/* D&D support */
+/* Drag & Drop */
 canvas.addEventListener('dragover', (e)=>{ e.preventDefault(); });
 canvas.addEventListener('drop', (e)=>{
   e.preventDefault();
@@ -752,25 +771,17 @@ canvas.addEventListener('drop', (e)=>{
   }
 });
 
-/* placeholder */
 function drawPlaceholder(){
   ctx.clearRect(0,0,canvas.width, canvas.height);
-  const w = canvas.width = Math.min(900, Math.max(600, window.innerWidth - 120));
+  const w = canvas.width = Math.min(800, window.innerWidth - 32);
   const h = canvas.height = Math.round(w * 0.62);
-  ctx.fillStyle = '#111';
+  ctx.fillStyle = '#2a2a2a';
   ctx.fillRect(0,0,w,h);
-  ctx.fillStyle = '#ddd';
-  ctx.font = '16px system-ui, -apple-system';
+  ctx.fillStyle = '#666';
+  ctx.font = 'bold 14px sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText('「写真を選ぶ」をタップしてください', w/2, h/2);
+  ctx.fillText('写真をここにドロップ', w/2, h/2);
 }
-drawPlaceholder();
-
 </script>
 </body>
 </html>
-
-
-
-
-
