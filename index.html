@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>レトロ写真加工アプリ</title>
 <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Micro+5&display=swap" rel="stylesheet">
 <style>
   :root{
     --bg:#0f1720;
@@ -125,7 +126,7 @@
     accent-color: var(--accent);
   }
 
-  /* 日付設定エリア (New) */
+  /* 日付設定エリア */
   .date-settings {
     width: 100%;
     background: #f3f4f6;
@@ -150,6 +151,7 @@
     align-items: center;
     gap: 6px;
     cursor: pointer;
+    font-weight: normal !important;
   }
   .date-row input[type="date"], .date-row select {
     padding: 6px;
@@ -157,7 +159,18 @@
     border-radius: 6px;
     font-size: 14px;
     background: #fff;
+    flex: 1;
+    min-width: 120px;
   }
+  .date-row .control-label {
+    font-weight: bold;
+    color: #333;
+  }
+  .date-options-group {
+    display: flex;
+    gap: 15px;
+  }
+
 
   .btn-row{
     width:100%;
@@ -241,6 +254,7 @@
     .thumb{width:56px;height:40px;}
     .date-row { flex-direction: column; align-items: stretch; }
     .date-row > * { width: 100%; box-sizing: border-box; }
+    .date-options-group { flex-direction: column; gap: 10px; }
   }
 
   footer{margin-top:12px;font-size:11px;color:var(--muted);text-align:center}
@@ -273,24 +287,29 @@
 
       <div class="date-settings">
         <div class="date-row">
-            <label style="font-weight:bold;">
+            <label class="control-label">
                 <input type="checkbox" id="dateToggle"> 日付を入れる
             </label>
+            <input type="date" id="dateInput">
         </div>
         <div class="date-row" id="dateOptions" style="display:none;">
-            <input type="date" id="dateInput">
-            <select id="datePosition">
-                <option value="br" selected>右下 (Bottom-Right)</option>
-                <option value="bl">左下 (Bottom-Left)</option>
-                <option value="tr">右上 (Top-Right)</option>
-                <option value="tl">左上 (Top-Left)</option>
-            </select>
+            <div class="date-options-group">
+                <select id="dateFont">
+                    <option value="vt323">デジタル風 (VT323)</option>
+                    <option value="micro5" selected>デジタル風 (Micro 5)</option>
+                </select>
+                <select id="datePosition">
+                    <option value="br" selected>右下 (Bottom-Right)</option>
+                    <option value="bl">左下 (Bottom-Left)</option>
+                    <option value="tr">右上 (Top-Right)</option>
+                    <option value="tl">左上 (Top-Left)</option>
+                </select>
+            </div>
         </div>
       </div>
 
       <div class="btn-row">
-        <button id="downloadBtn" class="secondary">画像を保存</button>
-        <button id="resetBtn">リセット</button>
+        <button id="downloadBtn">画像を保存</button>
       </div>
 
       <div id="filterBar" aria-hidden="false"></div>
@@ -310,14 +329,13 @@ const strengthSlider = document.getElementById('strengthSlider');
 const sliderLabel = document.getElementById('sliderLabel');
 const sliderValue = document.getElementById('sliderValue');
 const downloadBtn = document.getElementById('downloadBtn');
-const resetBtn = document.getElementById('resetBtn');
-const loadingOverlay = document.getElementById('loadingOverlay');
 
 // Date Stamp DOM
 const dateToggle = document.getElementById('dateToggle');
 const dateOptions = document.getElementById('dateOptions');
 const dateInput = document.getElementById('dateInput');
 const datePosition = document.getElementById('datePosition');
+const dateFont = document.getElementById('dateFont');
 
 let originalImageData = null;
 let currentFilter = 'original';
@@ -342,18 +360,21 @@ dateToggle.addEventListener('change', ()=>{
 });
 dateInput.addEventListener('change', requestRender);
 datePosition.addEventListener('change', requestRender);
+dateFont.addEventListener('change', requestRender);
 
 function requestRender(){
     if(!originalImageData) return;
-    // Debounce wrapper is mainly on slider, but direct calls are fine here
     showLoading(true);
-    requestAnimationFrame(async ()=>{
-        await renderCurrent();
-        showLoading(false);
+    // フォントが読み込まれるのを待機
+    document.fonts.ready.then(() => {
+        requestAnimationFrame(async ()=>{
+            await renderCurrent();
+            showLoading(false);
+        });
     });
 }
 
-/* --------- Filters Definition ---------- */
+/* --------- Filters Definition (省略) ---------- */
 const filters = [
   { id:'original', name:'Original' },
   { id:'1920s', name:'1920s\nSilent' },
@@ -400,8 +421,6 @@ function setActiveFilter(id){
     sliderRow.style.display = 'none';
   } else {
     sliderRow.style.display = 'flex';
-    // If resetting slider on change is desired:
-    // if(strengthSlider.value == 0) strengthSlider.value = 1.0;
     updateSliderLabel(strengthSlider.value);
   }
 }
@@ -418,7 +437,7 @@ function updateSliderLabel(val){
     sliderLabel.innerHTML = `${text}：<strong id="sliderValue">${v}</strong>`;
 }
 
-/* --------- Image Load Logic ---------- */
+/* --------- Image Load Logic (Same as before) ---------- */
 fileInput.addEventListener('change', async (e)=>{
   const file = e.target.files && e.target.files[0];
   if(!file) return;
@@ -454,8 +473,8 @@ function loadImage(src){
       originalImageData = ctx.getImageData(0,0,canvas.width, canvas.height);
       
       updateAllThumbnails();
-      setActiveFilter('1950s'); // Default
-      dateToggle.checked = true; // Default ON for retro feel
+      setActiveFilter('1950s');
+      dateToggle.checked = true;
       dateOptions.style.display = 'flex';
       
       requestRender();
@@ -466,20 +485,14 @@ function loadImage(src){
   });
 }
 
-/* --------- Helper Functions ---------- */
+/* --------- Helper Functions (Same as before) ---------- */
 function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
-
-function copyImageData(src){
-  return new ImageData(new Uint8ClampedArray(src.data), src.width, src.height);
-}
-
-/* Vignette */
+function copyImageData(src){ return new ImageData(new Uint8ClampedArray(src.data), src.width, src.height); }
 function applyVignette(data, width, height, strength){
   const cx = width/2;
   const cy = height/2;
   const maxDist = Math.sqrt(cx*cx + cy*cy);
   const power = 0.6 * strength; 
-
   for(let y=0; y<height; y++){
     for(let x=0; x<width; x++){
       const i = (y*width + x)*4;
@@ -487,7 +500,6 @@ function applyVignette(data, width, height, strength){
       const dy = y - cy;
       const d = Math.sqrt(dx*dx + dy*dy) / maxDist;
       const v = 1 - Math.pow(d, 2.5) * power;
-      
       data[i]   = clamp(data[i] * v, 0, 255);
       data[i+1] = clamp(data[i+1] * v, 0, 255);
       data[i+2] = clamp(data[i+2] * v, 0, 255);
@@ -495,16 +507,13 @@ function applyVignette(data, width, height, strength){
   }
 }
 
-/* --------- Filter Logic ---------- */
-
-/* 1920s */
+/* --------- Filter Logic (Same as before) ---------- */
 function apply1920s(src, strength){
   const img = copyImageData(src);
   const d = img.data;
   const noiseAmount = 60 * strength;
   const contrast = 1.0 + (0.5 * strength);
   const factor = (259 * (contrast + 255)) / (255 * (259 - contrast));
-
   for(let i=0; i<d.length; i+=4){
     let r = d[i], g = d[i+1], b = d[i+2];
     let gray = 0.299*r + 0.587*g + 0.114*b;
@@ -515,13 +524,10 @@ function apply1920s(src, strength){
   }
   return img;
 }
-
-/* 1950s */
 function apply1950s(src, strength){
   const img = copyImageData(src);
   const d = img.data;
   const w = img.width, h = img.height;
-
   for(let i=0; i<d.length; i+=4){
     let r = d[i], g = d[i+1], b = d[i+2];
     const gray = 0.299*r + 0.587*g + 0.114*b;
@@ -539,13 +545,10 @@ function apply1950s(src, strength){
   applyVignette(d, w, h, strength * 1.5);
   return img;
 }
-
-/* 1970s */
 function apply1970s(src, strength){
   const img = copyImageData(src);
   const d = img.data;
   const noiseAmt = 30 * strength;
-
   for(let i=0; i<d.length; i+=4){
     let r = d[i], g = d[i+1], b = d[i+2];
     const gray = 0.299*r + 0.587*g + 0.114*b;
@@ -565,15 +568,12 @@ function apply1970s(src, strength){
   }
   return img;
 }
-
-/* 1980s */
 function apply1980s(src, strength){
   const img = copyImageData(src);
   const d = img.data;
   const w = img.width;
   const noiseAmt = 40 * strength;
   const scanlineInt = 4;
-
   for(let i=0; i<d.length; i+=4){
     let r = d[i], g = d[i+1], b = d[i+2];
     const pixelIndex = i / 4;
@@ -630,31 +630,44 @@ async function renderCurrent(){
 }
 
 function drawDateStamp(){
-    const dateVal = dateInput.value; // yyyy-mm-dd
+    const dateVal = dateInput.value;
     if(!dateVal) return;
     
-    // Replace Hyphens with Dots
-    const text = dateVal.replace(/-/g, '.'); // 2025.12.09
+    const text = dateVal.replace(/-/g, '.');
 
     const w = canvas.width;
     const h = canvas.height;
     
-    // Font settings relative to image size
-    // Using a digital-style font 'VT323'
+    // フォントの選択
+    const selectedFont = dateFont.value;
+    let fontFamily = '';
+    if (selectedFont === 'vt323') {
+        fontFamily = "'VT323', monospace"; // 現行のデジタル風
+    } else if (selectedFont === 'micro5') {
+        // Micro 5フォントを指定
+        fontFamily = "'Micro 5', monospace"; 
+    }
+    
+    // サイズと余白
     const fontSize = Math.max(16, Math.floor(h * 0.05)); 
     const paddingX = Math.floor(w * 0.04);
     const paddingY = Math.floor(h * 0.04);
 
     ctx.save();
     
-    ctx.font = `${fontSize}px 'VT323', monospace`;
+    // Micro 5フォントは非常に小さいため、通常よりもサイズを大きくする必要がある場合があります
+    let effectiveFontSize = fontSize;
+    if (selectedFont === 'micro5') {
+        // Micro 5は通常のフォントより小さく表示されるため、補正する
+        effectiveFontSize = fontSize * 1.5; 
+    }
+
+    ctx.font = `${effectiveFontSize}px ${fontFamily}`;
     ctx.textBaseline = 'bottom';
     
-    // Retro Digital Orange Color
     const color = '#ff9900'; 
     ctx.fillStyle = color;
     
-    // Add Glow effect
     ctx.shadowColor = '#ff5500';
     ctx.shadowBlur = fontSize * 0.4;
     ctx.shadowOffsetX = 0;
@@ -664,32 +677,27 @@ function drawDateStamp(){
     const pos = datePosition.value;
     let x, y;
 
-    if(pos === 'br'){ // Bottom Right
+    if(pos === 'br'){ 
         ctx.textAlign = 'right';
         x = w - paddingX;
         y = h - paddingY;
-    } else if(pos === 'bl'){ // Bottom Left
+    } else if(pos === 'bl'){ 
         ctx.textAlign = 'left';
         x = paddingX;
         y = h - paddingY;
-    } else if(pos === 'tr'){ // Top Right
+    } else if(pos === 'tr'){ 
         ctx.textAlign = 'right';
         ctx.textBaseline = 'top';
         x = w - paddingX;
         y = paddingY;
-    } else if(pos === 'tl'){ // Top Left
+    } else if(pos === 'tl'){ 
         ctx.textAlign = 'left';
         ctx.textBaseline = 'top';
         x = paddingX;
         y = paddingY;
     }
 
-    // Draw text
-    // Optional: Draw slightly transparent to blend better
     ctx.globalAlpha = 0.85;
-    // Composite mode for "light emission" feel (optional, 'source-over' is safer)
-    // ctx.globalCompositeOperation = 'screen'; 
-    
     ctx.fillText(text, x, y);
 
     ctx.restore();
@@ -709,20 +717,11 @@ downloadBtn.addEventListener('click', ()=>{
   if(!originalImageData) return alert('画像を選択してください');
   const a = document.createElement('a');
   a.href = canvas.toDataURL('image/jpeg', 0.85);
-  a.download = `retro_${currentFilter}_edited.jpg`;
+  a.download = `retro_${currentFilter}_edited.jpg`; 
   a.click();
 });
 
-resetBtn.addEventListener('click', ()=>{
-  if(!originalImageData) return;
-  strengthSlider.value = 1;
-  setActiveFilter('original');
-  dateToggle.checked = false; // Reset date
-  dateOptions.style.display = 'none';
-  requestRender();
-});
-
-/* Create thumbnails with current filters (Thumbnails don't need date stamp) */
+/* Create thumbnails with current filters */
 function updateAllThumbnails(){
   const iw = originalImageData.width, ih = originalImageData.height;
   const tmp = document.createElement('canvas');
