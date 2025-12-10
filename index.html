@@ -3,9 +3,12 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>レトロ写真加工アプリ</title>
+<title>Retro Cam</title>
+<link rel="icon" href="icon.ico">
+<link rel="apple-touch-icon" href="icon.ico"> 
 <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Micro+5&display=swap" rel="stylesheet">
+
 <style>
   :root{
     --bg:#0f1720;
@@ -125,82 +128,8 @@
     max-width:540px;
     accent-color: var(--accent);
   }
-
-  /* 日付設定エリア */
-  .date-settings {
-    width: 100%;
-    background: #f3f4f6;
-    border-radius: 10px;
-    padding: 12px;
-    box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    margin-top: 5px;
-  }
-  .date-row {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: center;
-    gap: 15px;
-    font-size: 14px;
-  }
-  .date-row label {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    cursor: pointer;
-    font-weight: normal !important;
-  }
-  .date-row input[type="date"], .date-row select {
-    padding: 6px;
-    border: 1px solid #ccc;
-    border-radius: 6px;
-    font-size: 14px;
-    background: #fff;
-    flex: 1;
-    min-width: 120px;
-  }
-  .date-row .control-label {
-    font-weight: bold;
-    color: #333;
-  }
-  .date-options-group {
-    display: flex;
-    gap: 15px;
-  }
-
-
-  .btn-row{
-    width:100%;
-    margin-top:6px;
-    display:flex;
-    gap:10px;
-    justify-content:center;
-  }
-
-  button, .file-btn{
-    background:var(--accent);
-    color:white;
-    border:none;
-    padding:10px 14px;
-    border-radius:10px;
-    font-size:15px;
-    cursor:pointer;
-    box-shadow:0 4px 10px rgba(0,0,0,0.2);
-    text-align: center;
-    font-weight: bold;
-    transition: transform 0.1s;
-  }
-  button:active, .file-btn:active{ transform:scale(0.98); }
   
-  button.secondary{
-    background:#e6e6e6;
-    color:#0b1220;
-    box-shadow:none;
-  }
-
+  /* Filter Bar (前回と同じ) */
   #filterBar{
     margin-top:12px;
     display:flex;
@@ -242,7 +171,83 @@
     object-fit:cover;
   }
 
-  /* Custom Scrollbar */
+  /* 日付設定エリア */
+  .date-settings {
+    width: 100%;
+    background: #f3f4f6;
+    border-radius: 10px;
+    padding: 12px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 10px; /* フィルタバーの下に配置 */
+  }
+  .date-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+    font-size: 14px;
+  }
+  .date-row label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    font-weight: normal !important;
+  }
+  .date-row input[type="date"], .date-row select {
+    padding: 6px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 14px;
+    background: #fff;
+    flex: 1;
+    min-width: 120px;
+  }
+  .date-row .control-label {
+    font-weight: bold;
+    color: #333;
+  }
+  .date-options-group {
+    display: flex;
+    gap: 15px;
+  }
+
+
+  /* ボタン行 */
+  .btn-row{
+    width:100%;
+    margin-top:10px;
+    display:flex;
+    gap:10px;
+    justify-content:center;
+  }
+
+  button, .file-btn{
+    background:var(--accent);
+    color:white;
+    border:none;
+    padding:10px 14px;
+    border-radius:10px;
+    font-size:15px;
+    cursor:pointer;
+    box-shadow:0 4px 10px rgba(0,0,0,0.2);
+    text-align: center;
+    font-weight: bold;
+    transition: transform 0.1s;
+  }
+  button:active, .file-btn:active{ transform:scale(0.98); }
+  
+  button.secondary{
+    background:#e6e6e6;
+    color:#0b1220;
+    box-shadow:none;
+  }
+
+  /* Custom Scrollbar (前回と同じ) */
   #filterBar::-webkit-scrollbar { width: 8px; height: 12px; }
   #filterBar::-webkit-scrollbar-track { background: transparent; }
   #filterBar::-webkit-scrollbar-thumb { background: #ccc; border-radius: 30px; border: 3px solid transparent; background-clip: content-box;}
@@ -284,6 +289,8 @@
         <label id="sliderLabel">エフェクト強度：<strong id="sliderValue">1.00</strong></label>
         <input id="strengthSlider" class="range" type="range" min="0" max="1" step="0.05" value="1">
       </div>
+      
+      <div id="filterBar" aria-hidden="false"></div>
 
       <div class="date-settings">
         <div class="date-row">
@@ -295,8 +302,8 @@
         <div class="date-row" id="dateOptions" style="display:none;">
             <div class="date-options-group">
                 <select id="dateFont">
-                    <option value="vt323">デジタル風 (VT323)</option>
-                    <option value="micro5" selected>デジタル風 (Micro 5)</option>
+                    <option value="vt323" selected>デジタル風 (VT323)</option>
+                    <option value="micro5">デジタル風 (Micro 5)</option>
                 </select>
                 <select id="datePosition">
                     <option value="br" selected>右下 (Bottom-Right)</option>
@@ -312,7 +319,6 @@
         <button id="downloadBtn">画像を保存</button>
       </div>
 
-      <div id="filterBar" aria-hidden="false"></div>
     </div>
 
     <footer>※ 画像は端末内で処理され、外部へ送信されません。</footer>
@@ -477,6 +483,7 @@ function loadImage(src){
       dateToggle.checked = true;
       dateOptions.style.display = 'flex';
       
+      // 読み込み完了後にレンダリング
       requestRender();
       res();
     };
@@ -641,27 +648,32 @@ function drawDateStamp(){
     // フォントの選択
     const selectedFont = dateFont.value;
     let fontFamily = '';
-    if (selectedFont === 'vt323') {
-        fontFamily = "'VT323', monospace"; // 現行のデジタル風
-    } else if (selectedFont === 'micro5') {
-        // Micro 5フォントを指定
-        fontFamily = "'Micro 5', monospace"; 
-    }
     
-    // サイズと余白
-    const fontSize = Math.max(16, Math.floor(h * 0.05)); 
+    // ------------------------------------------------------------------
+    // 【修正点1】文字サイズを画像の縦幅に依存させず、固定値(24px)と画像の縦幅に対する比率の小さい方を使用
+    // ------------------------------------------------------------------
+    // 画像サイズに応じたベースサイズ (縦幅の約5%を目安)
+    const ratioSize = Math.floor(h * 0.04);
+    // 最小サイズは18px、最大サイズは40pxとし、キャンバスの大きさに過度に依存しないように安定化
+    const stableFontSize = clamp(ratioSize, 18, 40); 
+    
+    // 選択されたフォントに基づく最終的なサイズ調整
+    let effectiveFontSize = stableFontSize; 
+    
+    if (selectedFont === 'vt323') {
+        fontFamily = "'VT323', monospace"; 
+    } else if (selectedFont === 'micro5') {
+        fontFamily = "'Micro 5', monospace";
+        // Micro 5は通常のフォントより小さく表示されるため、補正する (VT323とサイズ感を合わせる)
+        effectiveFontSize = stableFontSize * 1.5; 
+    }
+    // ------------------------------------------------------------------
+
     const paddingX = Math.floor(w * 0.04);
     const paddingY = Math.floor(h * 0.04);
 
     ctx.save();
     
-    // Micro 5フォントは非常に小さいため、通常よりもサイズを大きくする必要がある場合があります
-    let effectiveFontSize = fontSize;
-    if (selectedFont === 'micro5') {
-        // Micro 5は通常のフォントより小さく表示されるため、補正する
-        effectiveFontSize = fontSize * 1.5; 
-    }
-
     ctx.font = `${effectiveFontSize}px ${fontFamily}`;
     ctx.textBaseline = 'bottom';
     
@@ -669,7 +681,7 @@ function drawDateStamp(){
     ctx.fillStyle = color;
     
     ctx.shadowColor = '#ff5500';
-    ctx.shadowBlur = fontSize * 0.4;
+    ctx.shadowBlur = stableFontSize * 0.4; // シャドウも安定化されたサイズを使用
     ctx.shadowOffsetX = 0;
     ctx.shadowOffsetY = 0;
 
@@ -679,22 +691,30 @@ function drawDateStamp(){
 
     if(pos === 'br'){ 
         ctx.textAlign = 'right';
-        x = w - paddingX;
         y = h - paddingY;
+        x = w - paddingX;
+        
+        // Micro 5はベースラインが低い傾向があるため、補正
+        if (selectedFont === 'micro5') y += stableFontSize * 0.2; 
+        
     } else if(pos === 'bl'){ 
         ctx.textAlign = 'left';
-        x = paddingX;
         y = h - paddingY;
+        x = paddingX;
+
+        if (selectedFont === 'micro5') y += stableFontSize * 0.2; 
+        
     } else if(pos === 'tr'){ 
         ctx.textAlign = 'right';
         ctx.textBaseline = 'top';
-        x = w - paddingX;
         y = paddingY;
+        x = w - paddingX;
+        
     } else if(pos === 'tl'){ 
         ctx.textAlign = 'left';
         ctx.textBaseline = 'top';
-        x = paddingX;
         y = paddingY;
+        x = paddingX;
     }
 
     ctx.globalAlpha = 0.85;
