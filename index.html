@@ -333,7 +333,6 @@ function showLoading(show){
   document.getElementById('loadingOverlay').style.display = show ? 'flex' : 'none';
 }
 
-/* 今日の日付設定 */
 const today = new Date();
 dateInput.value = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
@@ -360,7 +359,7 @@ const filters = [
   { id:'1950s', name:'1950s\nVintage' },
   { id:'1970s', name:'1970s\nWarm' },
   { id:'1980s', name:'1980s\nVHS' },
-  { id:'pixel', name:'Lo-Fi\nPixel' }
+  { id:'classic', name:'Classic\nFilm' } // フィルタ名を変更
 ];
 
 function createFilterBar(){
@@ -384,7 +383,6 @@ function createFilterBar(){
   });
 }
 
-/* フィルタ切り替え時にスライダーの設定を動的に変更 */
 function setActiveFilter(id){
   currentFilter = id;
   document.querySelectorAll('.filterItem').forEach(el=>{
@@ -395,17 +393,8 @@ function setActiveFilter(id){
     sliderRow.style.display = 'none';
   } else {
     sliderRow.style.display = 'flex';
-    
-    // Lo-Fi Pixelのときだけレンジを変更
-    if(id === 'pixel') {
-      strengthSlider.max = "0.20";
-      strengthSlider.step = "0.01";
-      // 値が範囲外なら調整
-      if(parseFloat(strengthSlider.value) > 0.2) strengthSlider.value = "0.10";
-    } else {
-      strengthSlider.max = "1.00";
-      strengthSlider.step = "0.05";
-    }
+    strengthSlider.max = "1.00";
+    strengthSlider.step = "0.05";
     updateSliderLabel(strengthSlider.value);
   }
 }
@@ -418,7 +407,7 @@ function updateSliderLabel(val){
     else if(currentFilter === '1950s') text = "色褪せ度";
     else if(currentFilter === '1970s') text = "暖色強調";
     else if(currentFilter === '1980s') text = "走査線強度";
-    else if(currentFilter === 'pixel') text = "画素の粗さ";
+    else if(currentFilter === 'classic') text = "レトロ強度"; // ラベル変更
     sliderLabel.innerHTML = `${text}：<strong id="sliderValue">${v}</strong>`;
 }
 
@@ -465,6 +454,25 @@ function loadImage(src){
 function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
 function copyImageData(src){ return new ImageData(new Uint8ClampedArray(src.data), src.width, src.height); }
 
+function applyVignette(data, width, height, strength){
+  const cx = width/2;
+  const cy = height/2;
+  const maxDist = Math.sqrt(cx*cx + cy*cy);
+  const power = 0.6 * strength; 
+  for(let y=0; y<height; y++){
+    for(let x=0; x<width; x++){
+      const i = (y*width + x)*4;
+      const dx = x - cx;
+      const dy = y - cy;
+      const d = Math.sqrt(dx*dx + dy*dy) / maxDist;
+      const v = 1 - Math.pow(d, 2.5) * power;
+      data[i]   = clamp(data[i] * v, 0, 255);
+      data[i+1] = clamp(data[i+1] * v, 0, 255);
+      data[i+2] = clamp(data[i+2] * v, 0, 255);
+    }
+  }
+}
+
 /* 各フィルタロジック */
 function apply1920s(src, strength){
   const img = copyImageData(src); const d = img.data;
@@ -479,7 +487,7 @@ function apply1920s(src, strength){
 }
 
 function apply1950s(src, strength){
-  const img = copyImageData(src); const d = img.data;
+  const img = copyImageData(src); const d = img.data; const w = img.width, h = img.height;
   for(let i=0; i<d.length; i+=4){
     const gray = 0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2];
     const desat = 0.4 * strength; 
@@ -487,6 +495,7 @@ function apply1950s(src, strength){
     d[i+1] = clamp(d[i+1]*(1-desat) + gray*desat * (1 + 0.05 * strength), 0, 255);
     d[i+2] = clamp(d[i+2]*(1-desat) + gray*desat * (1 - 0.15 * strength), 0, 255);
   }
+  applyVignette(d, w, h, strength * 1.5);
   return img;
 }
 
@@ -512,28 +521,38 @@ function apply1980s(src, strength){
   return img;
 }
 
-/* 画素を粗くするフィルタ（0.01単位の調整に対応） */
-function applyPixelate(src, strength) {
+/* 新しい Classic Film フィルタ (ロジックを全面修正) */
+function applyClassicFilm(src, strength) {
   const img = copyImageData(src);
   const d = img.data;
-  const w = img.width, h = img.height;
-  
-  // 0.25がフルスケールとなるようマッピング（1〜11px程度のブロックサイズ）
-  const blockSize = Math.floor(1 + strength * 50); 
-  if (blockSize <= 1) return img;
+  // ノイズ量は少し控えめに
+  const noiseAmt = 30 * strength;
 
-  for (let y = 0; y < h; y += blockSize) {
-    for (let x = 0; x < w; x += blockSize) {
-      const i = (y * w + x) * 4;
-      const r = d[i], g = d[i+1], b = d[i+2], a = d[i+3];
-      for (let by = 0; by < blockSize && y + by < h; by++) {
-        for (let bx = 0; bx < blockSize && x + bx < w; bx++) {
-          const idx = ((y + by) * w + (x + bx)) * 4;
-          d[idx] = r; d[idx+1] = g; d[idx+2] = b; d[idx+3] = a;
-        }
-      }
-    }
+  for(let i=0; i<d.length; i+=4){
+    let r = d[i], g = d[i+1], b = d[i+2];
+
+    // 1. 彩度を少し下げる (Desaturation)
+    const gray = 0.299*r + 0.587*g + 0.114*b;
+    const desatStrength = 0.3 * strength; // 30%程度彩度を落とす
+    r = r * (1 - desatStrength) + gray * desatStrength;
+    g = g * (1 - desatStrength) + gray * desatStrength;
+    b = b * (1 - desatStrength) + gray * desatStrength;
+
+    // 2. 色調補正 (温かみのあるセピア調へ)
+    // 赤を少し強く、青を少し弱くして、黄色/オレンジ寄りにする
+    r *= (1 + 0.15 * strength);
+    g *= (1 + 0.05 * strength);
+    b *= (1 - 0.15 * strength);
+
+    // 3. フィルム粒子ノイズを追加
+    const rand = (Math.random() - 0.5) * noiseAmt;
+    r += rand; g += rand; b += rand;
+
+    d[i] = clamp(r, 0, 255);
+    d[i+1] = clamp(g, 0, 255);
+    d[i+2] = clamp(b, 0, 255);
   }
+  // ヴィネット効果は削除
   return img;
 }
 
@@ -548,7 +567,7 @@ async function renderCurrent(){
         else if(currentFilter === '1950s') out = apply1950s(originalImageData, strength);
         else if(currentFilter === '1970s') out = apply1970s(originalImageData, strength);
         else if(currentFilter === '1980s') out = apply1980s(originalImageData, strength);
-        else if(currentFilter === 'pixel') out = applyPixelate(originalImageData, strength);
+        else if(currentFilter === 'classic') out = applyClassicFilm(originalImageData, strength); // 新フィルタ適用
         ctx.putImageData(out, 0, 0);
         if(dateToggle.checked) drawDateStamp();
         resolve();
@@ -602,7 +621,7 @@ function updateAllThumbnails(){
     else if(fId === '1950s') out = apply1950s(smallData, 1.0);
     else if(fId === '1970s') out = apply1970s(smallData, 1.0);
     else if(fId === '1980s') out = apply1980s(smallData, 1.0);
-    else if(fId === 'pixel') out = applyPixelate(smallData, 0.1); 
+    else if(fId === 'classic') out = applyClassicFilm(smallData, 1.0); // サムネイルにも適用
     ctxT.putImageData(out,0,0);
   });
 }
